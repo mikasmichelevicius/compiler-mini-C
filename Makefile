@@ -6,7 +6,7 @@ FLAGS_FOR_DCS_SYSTEMS=-stdlib=libstdc++ -cxx-isystem /local/java/gcc-9.2.0/inclu
 
 
 mccomp: mccomp.cpp
-	$(CXX) mccomp.cpp $(CFLAGS) $(FLAGS_FOR_DCS_SYSTEMS) -o mccomp
+	$(CXX) mccomp.cpp $(CFLAGS) -o mccomp
 
 clean:
 	rm -rf mccomp 
