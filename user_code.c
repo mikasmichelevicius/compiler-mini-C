@@ -1,7 +1,5 @@
-int main(int a) {
-	int a;
-	int b;
-	a=10;
-	b=a*15;
-	return a+b;
+extern int test(int a, int b);
+
+int main(int a, int b) {
+	return c;
 }
