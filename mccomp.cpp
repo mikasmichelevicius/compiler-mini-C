@@ -561,7 +561,7 @@ class AssignASTnode : public ASTnode {
   std::unique_ptr<ASTnode> Assignment;
 
 public:
-  AssignASTnode(std::unique_ptr<ASTnode> ident, std::unique_ptr<ASTnode> assignment) : Id(std::move(ident)), Assignment(std::move(assignment)) {}
+  AssignASTnode(std::unique_ptr<ASTnode> ident_node, std::unique_ptr<ASTnode> assignment) : Id(std::move(ident_node)), Assignment(std::move(assignment)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
     ident = ident + "   ";
@@ -578,7 +578,7 @@ class FunCallASTnode : public ASTnode {
   std::unique_ptr<ASTnode> Id;
   std::vector<std::unique_ptr<ASTnode>> Args;
 public:
-  FunCallASTnode(std::unique_ptr<ASTnode> ident, std::vector<std::unique_ptr<ASTnode>> args) : Id(std::move(ident)), Args(std::move(args)) {}
+  FunCallASTnode(std::unique_ptr<ASTnode> ident_node, std::vector<std::unique_ptr<ASTnode>> args) : Id(std::move(ident_node)), Args(std::move(args)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
     ident = ident + "   ";
@@ -630,7 +630,7 @@ class LocalDeclASTnode : public ASTnode {
   std::unique_ptr<ASTnode> Id;
   std::unique_ptr<ASTnode> Semicol;
 public:
-  LocalDeclASTnode(std::unique_ptr<ASTnode> type, std::unique_ptr<ASTnode> ident, std::unique_ptr<ASTnode> semicol) : Type(std::move(type)), Id(std::move(ident)), Semicol(std::move(semicol)) {}
+  LocalDeclASTnode(std::unique_ptr<ASTnode> type, std::unique_ptr<ASTnode> ident_node, std::unique_ptr<ASTnode> semicol) : Type(std::move(type)), Id(std::move(ident_node)), Semicol(std::move(semicol)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
     ident = ident + "   ";
@@ -764,7 +764,7 @@ class ParamASTnode : public ASTnode {
   std::unique_ptr<ASTnode> Type;
   std::unique_ptr<ASTnode> Id;
 public:
-  ParamASTnode(std::unique_ptr<ASTnode> type, std::unique_ptr<ASTnode> ident) : Type(std::move(type)), Id(std::move(ident)) {}
+  ParamASTnode(std::unique_ptr<ASTnode> type, std::unique_ptr<ASTnode> ident_node) : Type(std::move(type)), Id(std::move(ident_node)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
     ident = ident + "   ";
@@ -792,7 +792,7 @@ public:
       ident.resize(ident.size()-3);
     }
     ident = ident + "   ";
-    ret = ret + "\n Function Block: " + Block->to_string().c_str();
+    ret = ret + "\n"+ident+"Function Block: " + Block->to_string().c_str();
     ident.resize(ident.size()-3);
     return ret;
   }
@@ -807,7 +807,7 @@ public:
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
     ident = ident + "   ";
-    std::string ret = "\n " + ident + "Function: "+Type->to_string() + Id->to_string().c_str() + FuncDecl->to_string().c_str();
+    std::string ret = "\n" + ident + "Function: "+Type->to_string() + Id->to_string().c_str() + FuncDecl->to_string().c_str();
     ident.resize(ident.size()-3);
     return ret;
     // return std::string(Type->to_string().c_str())+Id+std::string(FuncDecl->to_string().c_str());
@@ -838,24 +838,16 @@ public:
   ExternASTnode(std::unique_ptr<ASTnode> type, std::unique_ptr<ASTnode> tok, std::vector<std::unique_ptr<ASTnode>> params) : Type(std::move(type)), Id(std::move(tok)), Params(std::move(params)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    std::string ret = "\nExternFunctionDef: " + Type->to_string() + Id->to_string().c_str();
+    std::string ret = "\n"+ident+"ExternFunctionDef: " + Type->to_string() + Id->to_string().c_str();
     if (Params.size()>0) {
       ident = ident + "   ";
-      ret = ret + "\n " + ident.c_str() + "Parameters:";
+      ret = ret + "\n" + ident.c_str() + "Parameters:";
       for(unsigned i=0; i<Params.size(); i++) {
         ret = ret + Params.at(i)->to_string().c_str();
       }
       ident.resize( ident.size()-3 );
     }
 
-    // std::string ret = "extern "+std::string(Type->to_string().c_str())+Id+"(";
-    // if (Params.size()>0) {
-    //   for(unsigned i=0; i<Params.size()-1; i++) {
-    //     ret = ret + std::string(Params.at(i)->to_string().c_str())+", ";
-    //   }
-    //   ret = ret + std::string(Params.at(Params.size()-1)->to_string().c_str());
-    // }
-    // ret = ret + ");";
     return ret;
   }
 };
@@ -879,11 +871,11 @@ public:
     }
     if (DeclList.size()>0){
       ret = ret + "\nFunctionDeclarations: ";
-      ident = ident + "   ";
+      //ident = ident + "   ";
       for(unsigned i=0; i<DeclList.size(); i++) {
         ret = ret+DeclList.at(i)->to_string().c_str();
       }
-      ident.resize( ident.size()-3 );
+      //ident.resize( ident.size()-3 );
     }
     return ret;
   }
