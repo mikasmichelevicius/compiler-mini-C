@@ -122,7 +122,7 @@ static float FloatVal;            // Filled in if FLOAT_LIT
 static std::string StringVal;     // Filled in if String Literal
 static int lineNo, columnNo;
 
-extern std::string ident = "";
+extern std::string indentation = "";
 
 static TOKEN returnTok(std::string lexVal, int tok_type) {
   TOKEN return_tok;
@@ -419,9 +419,9 @@ public:
   IntASTnode(TOKEN tok, int val) : Val(val), Tok(tok) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"IntegerLiteral 'int', value: "+std::to_string(Val);
-    ident.resize(ident.size()-3);
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"IntegerLiteral 'int', value: "+std::to_string(Val);
+    indentation.resize(indentation.size()-3);
     return ret;
     // return std::to_string(Val);
   }
@@ -436,9 +436,9 @@ public:
   FloatASTnode(TOKEN tok, float val) : Val(val), Tok(tok) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"FloatLiteral 'float', value: "+std::to_string(Val);
-    ident.resize(ident.size()-3);
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"FloatLiteral 'float', value: "+std::to_string(Val);
+    indentation.resize(indentation.size()-3);
     return ret;
     // return std::to_string(Val);
   }
@@ -454,9 +454,9 @@ public:
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
     //return std::to_string(Val);
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"BooleanLiteral 'bool', value: "+Name;
-    ident.resize(ident.size()-3);
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"BooleanLiteral 'bool', value: "+Name;
+    indentation.resize(indentation.size()-3);
     return ret;
 
     // return Name;
@@ -482,9 +482,9 @@ public:
   IdentASTnode(TOKEN tok) : Tok(tok), Name(tok.lexeme.c_str()) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"FuncOrVarIdentity 'ident', value: '"+Name+"'";
-    ident.resize(ident.size()-3);
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"FuncOrVarIdentity 'ident', value: '"+Name+"'";
+    indentation.resize(indentation.size()-3);
     return ret;
     // return Name;
   }
@@ -500,9 +500,9 @@ public:
   NegativeASTnode(TOKEN tok, char op, std::unique_ptr<ASTnode> expr) : Op(op), Tok(tok), Expr(std::move(expr)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"NegOfExpression, prefix: '" + std::string(1, Op) +"'"+Expr->to_string().c_str()+std::string(1,')');
-    ident.resize(ident.size()-3);
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"NegOfExpression, prefix: '" + std::string(1, Op) +"'"+Expr->to_string().c_str()+std::string(1,')');
+    indentation.resize(indentation.size()-3);
     return ret;
     // return std::string(1,'(')+std::string(1, Op)+Expr->to_string().c_str()+std::string(1,')');
   }
@@ -518,11 +518,11 @@ public:
   ExpressionASTnode(TOKEN op, std::unique_ptr<ASTnode> lhs, std::unique_ptr<ASTnode> rhs) : Op(op.lexeme.c_str()), LHS(std::move(lhs)), RHS(std::move(rhs)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"ArithmeticExpr, binary operator: '"+Op+"'";
-    ident = ident + "   ";
-    ret = ret + "\n"+ident+"LeftHandSide of expression: "+LHS->to_string()+"\n"+ident+"RightHandSide of expression: "+RHS->to_string().c_str();
-    ident.resize(ident.size()-6);
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"ArithmeticExpr, binary operator: '"+Op+"'";
+    indentation = indentation + "   ";
+    ret = ret + "\n"+indentation+"├── "+"LeftHandSide of expression: "+LHS->to_string()+"\n"+indentation+"├── "+"RightHandSide of expression: "+RHS->to_string().c_str();
+    indentation.resize(indentation.size()-6);
     return ret;
     // return LHS->to_string().c_str()+Op+RHS->to_string().c_str();
 
@@ -536,9 +536,9 @@ public:
   ExprEnclosedASTnode(std::unique_ptr<ASTnode> expr) : Expr(std::move(expr)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"Expression in parantheses: " + Expr->to_string();
-    ident.resize(ident.size()-3);
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"Expression in parantheses: " + Expr->to_string();
+    indentation.resize(indentation.size()-3);
     return ret;
     // return std::string(1,'(')+Expr->to_string().c_str()+std::string(1,')');
   }
@@ -564,11 +564,11 @@ public:
   AssignASTnode(std::unique_ptr<ASTnode> ident_node, std::unique_ptr<ASTnode> assignment) : Id(std::move(ident_node)), Assignment(std::move(assignment)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"AssignmentExpr, binary operator: '" + std::string(1,'=') + "'";
-    ident = ident + "   ";
-    ret = ret + "\n"+ident+"IdentityOfAssignment: " + Id->to_string().c_str() + "\n"+ident+"Assignment expression:" + Assignment->to_string().c_str();
-    ident.resize(ident.size()-6);
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"AssignmentExpr, binary operator: '" + std::string(1,'=') + "'";
+    indentation = indentation + "   ";
+    ret = ret + "\n"+indentation+"├── "+"IdentityOfAssignment: " + Id->to_string().c_str() + "\n"+indentation+"├── "+"Assignment expression:" + Assignment->to_string().c_str();
+    indentation.resize(indentation.size()-6);
     return ret;
     // return Id+std::string(1,'=')+Assignment->to_string().c_str();
   }
@@ -581,17 +581,17 @@ public:
   FunCallASTnode(std::unique_ptr<ASTnode> ident_node, std::vector<std::unique_ptr<ASTnode>> args) : Id(std::move(ident_node)), Args(std::move(args)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"FunctionCall Expression. Function call identity: '" + Id->to_string() + "'";
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"FunctionCall Expression. Function call identity: '" + Id->to_string() + "'";
 
     if (Args.size()>0) {
-      ret = ret + "\n"+ident+"Arguments of function call:";
-      ident = ident + "   ";
+      ret = ret + "\n"+indentation+"├── "+"Arguments of function call:";
+      indentation = indentation + "   ";
       for (unsigned i=0; i<Args.size(); i++) {
         ret = ret + Args.at(i)->to_string().c_str();
       }
     }
-    ident.resize(ident.size()-6);
+    indentation.resize(indentation.size()-6);
 
     return ret;
   }
@@ -603,9 +603,9 @@ public:
   VarTypeASTnode(TOKEN tok) : Type(tok.lexeme.c_str()) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"VarOrFuncType, value: '" + Type + "'";
-    ident.resize(ident.size()-3);
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"VarOrFuncType, value: '" + Type + "'";
+    indentation.resize(indentation.size()-3);
     return ret;
     // return Type+" ";
   }
@@ -617,9 +617,9 @@ public:
   VoidASTnode(TOKEN tok) : Type(tok.lexeme.c_str()) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"VoidFuncType, value: '" + Type + "'";
-    ident.resize(ident.size()-3);
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"VoidFuncType, value: '" + Type + "'";
+    indentation.resize(indentation.size()-3);
     return ret;
     // return Type;
   }
@@ -633,9 +633,9 @@ public:
   LocalDeclASTnode(std::unique_ptr<ASTnode> type, std::unique_ptr<ASTnode> ident_node, std::unique_ptr<ASTnode> semicol) : Type(std::move(type)), Id(std::move(ident_node)), Semicol(std::move(semicol)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"LocalDeclOfVar:"+Type->to_string()+Id->to_string();
-    ident.resize(ident.size()-3);
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"LocalDeclOfVar:"+Type->to_string()+Id->to_string();
+    indentation.resize(indentation.size()-3);
     return ret;
     // return Type->to_string().c_str()+Id+std::string(Semicol->to_string().c_str());
   }
@@ -648,25 +648,25 @@ public:
   BlockASTnode(std::vector<std::unique_ptr<ASTnode>> decls, std::vector<std::unique_ptr<ASTnode>> stmts) : Decls(std::move(decls)), Stmts(std::move(stmts)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"BlockExpression: ";
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"BlockExpression: ";
     if (Decls.size()>0) {
-      ident = ident + "   ";
-      ret = ret + "\n"+ident+"LocalDeclarations within the block:";
+      indentation = indentation + "   ";
+      ret = ret + "\n"+indentation+"├── "+"LocalDeclarations within the block:";
       for (unsigned i=0; i<Decls.size(); i++) {
         ret = ret + std::string(Decls.at(i)->to_string().c_str());
       }
-      ident.resize(ident.size()-3);
+      indentation.resize(indentation.size()-3);
     }
     if (Stmts.size()>0) {
-      ident = ident + "   ";
-      ret = ret + "\n"+ident+"StatementList within the block:";
+      indentation = indentation + "   ";
+      ret = ret + "\n"+indentation+"├── "+"StatementList within the block:";
       for (unsigned i=0; i<Stmts.size(); i++) {
         ret = ret + std::string(Stmts.at(i)->to_string().c_str());
       }
-      ident.resize(ident.size()-3);
+      indentation.resize(indentation.size()-3);
     }
-    ident.resize(ident.size()-3);
+    indentation.resize(indentation.size()-3);
     return ret;
   }
 };
@@ -679,14 +679,14 @@ public:
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
 
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"WhileStmt:";
-    ident = ident + "   ";
-    ret = ret + "\n"+ident+"Expression in While Statement:";
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"WhileStmt:";
+    indentation = indentation + "   ";
+    ret = ret + "\n"+indentation+"├── "+"Expression in While Statement:";
     ret = ret + Expr->to_string().c_str();
-    ret = ret + "\n"+ident+"StatementsExpr in the While block:";
+    ret = ret + "\n"+indentation+"├── "+"StatementsExpr in the While block:";
     ret = ret + Stmt->to_string().c_str();
-    ident.resize(ident.size()-6);
+    indentation.resize(indentation.size()-6);
     // std::string ret = "while (";
     // ret = ret + std::string(Expr->to_string().c_str()) + ")";
     // ret = ret + std::string(Stmt->to_string().c_str());
@@ -703,14 +703,14 @@ public:
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
 
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"IfStatement:";
-    ident = ident + "   ";
-    ret = ret + "\n"+ident+"If statement expression: " + Expr->to_string() + "\n"+ident+"Block of If statement: " + Block->to_string().c_str();
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"IfStatement:";
+    indentation = indentation + "   ";
+    ret = ret + "\n"+indentation+"├── "+"If statement expression: " + Expr->to_string() + "\n"+indentation+"├── "+"Block of If statement: " + Block->to_string().c_str();
     if (Else) {
-      ret = ret + "\n"+ident+"Else block of If Statement: " + Else->to_string().c_str();
+      ret = ret + "\n"+indentation+"├── "+"Else block of If Statement: " + Else->to_string().c_str();
     }
-    ident.resize(ident.size()-6);
+    indentation.resize(indentation.size()-6);
     // std::string ret = "if (";
     // ret = ret + std::string(Expr->to_string().c_str()) + ")";
     // ret = ret + std::string(Block->to_string().c_str());
@@ -727,9 +727,9 @@ public:
   ElseASTnode(std::unique_ptr<ASTnode> block) : Block(std::move(block)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n"+ident+"ElseBlock of If statement: " + Block->to_string();
-    ident.resize(ident.size()-3);
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"ElseBlock of If statement: " + Block->to_string();
+    indentation.resize(indentation.size()-3);
     // std::string ret = "else ";
     // ret = ret + std::string(Block->to_string().c_str());
     return ret;
@@ -743,14 +743,14 @@ public:
   ReturnASTnode(std::unique_ptr<ASTnode> expr, std::unique_ptr<ASTnode> semicol) : Expr(std::move(expr)), Semicol(std::move(semicol)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n" + ident +"ReturnStatement";
+    indentation = indentation + "   ";
+    std::string ret = "\n" +indentation+"├── "+"ReturnStatement";
     if (Expr) {
-      ident = ident + "   ";
-      ret = ret + "\n "+ident +"ReturnExpression:" + Expr->to_string().c_str();
-      ident.resize(ident.size()-3);
+      indentation = indentation + "   ";
+      ret = ret + "\n "+indentation +"├── "+"ReturnExpression:" + Expr->to_string().c_str();
+      indentation.resize(indentation.size()-3);
     }
-    ident.resize(ident.size()-3);
+    indentation.resize(indentation.size()-3);
     // std::string ret = "return ";
     // if (Expr) {
     //   ret = ret + std::string(Expr->to_string().c_str());
@@ -767,9 +767,9 @@ public:
   ParamASTnode(std::unique_ptr<ASTnode> type, std::unique_ptr<ASTnode> ident_node) : Type(std::move(type)), Id(std::move(ident_node)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n" +ident +"Parameter of Function: " + Type->to_string() + Id->to_string().c_str();
-    ident.resize(ident.size()-3);
+    indentation = indentation + "   ";
+    std::string ret = "\n" +indentation +"├── "+"Parameter of Function: " + Type->to_string() + Id->to_string().c_str();
+    indentation.resize(indentation.size()-3);
     return ret;
     // return std::string(Type->to_string().c_str())+Id;
   }
@@ -784,16 +784,16 @@ public:
   virtual std::string to_string() const override {
     std::string ret = "";
     if (Params.size()>0) {
-      ident = ident + "   ";
-      ret = ret + "\n"+ident+"Parameters:";
+      indentation = indentation + "   ";
+      ret = ret + "\n"+indentation+"├── "+"Parameters:";
       for(unsigned i=0; i<Params.size(); i++) {
         ret = ret + Params.at(i)->to_string().c_str();
       }
-      ident.resize(ident.size()-3);
+      indentation.resize(indentation.size()-3);
     }
-    ident = ident + "   ";
-    ret = ret + "\n"+ident+"Function Block: " + Block->to_string().c_str();
-    ident.resize(ident.size()-3);
+    indentation = indentation + "   ";
+    ret = ret + "\n"+indentation+"├── "+"Function Block: " + Block->to_string().c_str();
+    indentation.resize(indentation.size()-3);
     return ret;
   }
 };
@@ -806,9 +806,9 @@ public:
   FuncASTnode(std::unique_ptr<ASTnode> type, std::unique_ptr<ASTnode> tok, std::unique_ptr<ASTnode> func_decl) : Type(std::move(type)), Id(std::move(tok)), FuncDecl(std::move(func_decl)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n" + ident + "Function: "+Type->to_string() + Id->to_string().c_str() + FuncDecl->to_string().c_str();
-    ident.resize(ident.size()-3);
+    indentation = indentation + "   ";
+    std::string ret = "\n" +indentation+ "├── "+"Function: "+Type->to_string() + Id->to_string().c_str() + FuncDecl->to_string().c_str();
+    indentation.resize(indentation.size()-3);
     return ret;
     // return std::string(Type->to_string().c_str())+Id+std::string(FuncDecl->to_string().c_str());
   }
@@ -822,10 +822,10 @@ public:
   VarASTnode(std::unique_ptr<ASTnode> type, std::unique_ptr<ASTnode> tok, std::unique_ptr<ASTnode> semicol) : Type(std::move(type)), Id(std::move(tok)), Semicol(std::move(semicol)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    ident = ident + "   ";
-    std::string ret = "\n "+ ident + "VariableDef: " + Type->to_string() + Id->to_string().c_str();
+    indentation = indentation + "   ";
+    std::string ret = "\n "+indentation+ "├── "+"VariableDef: " + Type->to_string() + Id->to_string().c_str();
     // return Type->to_string().c_str()+Id+Semicol->to_string().c_str();
-    ident.resize(ident.size()-3);
+    indentation.resize(indentation.size()-3);
     return ret;
   }
 };
@@ -838,14 +838,14 @@ public:
   ExternASTnode(std::unique_ptr<ASTnode> type, std::unique_ptr<ASTnode> tok, std::vector<std::unique_ptr<ASTnode>> params) : Type(std::move(type)), Id(std::move(tok)), Params(std::move(params)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
-    std::string ret = "\n"+ident+"ExternFunctionDef: " + Type->to_string() + Id->to_string().c_str();
+    std::string ret = "\n"+indentation+"├── "+"ExternFunctionDef: " + Type->to_string() + Id->to_string().c_str();
     if (Params.size()>0) {
-      ident = ident + "   ";
-      ret = ret + "\n" + ident.c_str() + "Parameters:";
+      indentation = indentation + "   ";
+      ret = ret + "\n" + indentation + "├── "+"Parameters:";
       for(unsigned i=0; i<Params.size(); i++) {
         ret = ret + Params.at(i)->to_string().c_str();
       }
-      ident.resize( ident.size()-3 );
+      indentation.resize( indentation.size()-3 );
     }
 
     return ret;
@@ -861,21 +861,21 @@ public:
   virtual std::string to_string() const override {
     std::string ret;
     if (ExtrnList.size()>0){
-      ident = ident + "   ";
-      ret = ret + "ExternFunctions:";
+      indentation = indentation + "   ";
+      ret = ret + "├── "+"ExternFunctions:";
       for(unsigned i=0; i<ExtrnList.size(); i++) {
         ret = ret + ExtrnList.at(i)->to_string().c_str();
 
       }
-      ident.resize( ident.size()-3 );
+      indentation.resize( indentation.size()-3 );
     }
     if (DeclList.size()>0){
-      ret = ret + "\nFunctionDeclarations: ";
-      //ident = ident + "   ";
+      ret = ret + "\n"+"├── "+"FunctionDeclarations: ";
+      //indentation = indentation + "   ";
       for(unsigned i=0; i<DeclList.size(); i++) {
         ret = ret+DeclList.at(i)->to_string().c_str();
       }
-      //ident.resize( ident.size()-3 );
+      //indentation.resize( indentation.size()-3 );
     }
     return ret;
   }
@@ -923,17 +923,12 @@ static std::unique_ptr<ASTnode> parser() {
   if (CurTok.type == EXTERN) {
     auto extern_list = ParseExternList();
     int t = CurTok.type;
-    fprintf(stderr, "%d, %d\n", CurTok.type, INT_TOK);
     if ((t != VOID_TOK) && (t != INT_TOK) && (t != FLOAT_TOK) && (t != BOOL_TOK)) {
-      fprintf(stderr, "%s\n", CurTok.lexeme.c_str());
       LogError("ERROR. Missing function type.");
     }
     auto decl_list = ParseDeclList();
     auto Result = std::make_unique<ProgramASTnode>(std::move(extern_list), std::move(decl_list));
     return std::move(Result);
-    // fprintf(stderr, "parsed result is: \n%s\n", Result->to_string().c_str());
-
-    // return std::move(Result);
 
   } else {
     int t = CurTok.type;
@@ -944,9 +939,6 @@ static std::unique_ptr<ASTnode> parser() {
     auto decl_list = ParseDeclList();
     auto Result = std::make_unique<ProgramASTnode>(std::move(empty_list), std::move(decl_list));
     return std::move(Result);
-    // fprintf(stderr, "parsed result is: \n%s\n", Result->to_string().c_str());
-
-    // return std::move(Result);
   }
 
 }
@@ -1023,12 +1015,9 @@ static std::unique_ptr<ASTnode> ParseExtern() {
       }
 
     } else {
-      // fprintf(stderr, "ERROR missing type of extern function\n");
       LogError("ERROR. Missing type of extern function.");
     }
 
-  } else {
-    fprintf(stderr, "KAZKAS ERROR\n");
   }
   return nullptr;
 }
@@ -1347,7 +1336,6 @@ static std::vector<std::unique_ptr<ASTnode>> ParseStmtList() {
   std::vector<std::unique_ptr<ASTnode>> stmt_list;
 
   int t = CurTok.type;
-  fprintf(stderr, "%d, %d\n",RPAR,t);
   if (t == RBRA) {
     return stmt_list;
   }
@@ -1925,26 +1913,12 @@ int main(int argc, char **argv) {
 
   // Run the parser now.
   auto ASTree = parser();
-  // auto expr = ParseExternList();
-  // for (unsigned i=0; i<expr.size(); i++) {
-  //   fprintf(stderr, "===\n");
-  //   fprintf(stderr, "%s\n", expr.at(i)->to_string().c_str());
-  // }
-  // fprintf(stderr, "test node value is \n%s\n", ASTree->to_string().c_str());
-  fprintf(stderr, "%s\n", CurTok.lexeme.c_str());
+
   fprintf(stderr, "Parsing Finished\n");
 
 
   llvm::outs() << *ASTree << "\n";
 
-  std::string test = "aa";
-  fprintf(stderr, "%s\n", test.c_str());
-  test.resize(test.size()-1);
-  fprintf(stderr, "%s\n", test.c_str());
-  test = test + "aaa";
-  fprintf(stderr, "%s\n", test.c_str());
-  test.resize(test.size()-2);
-  fprintf(stderr, "%s\n", test.c_str());
 
 
 
