@@ -417,7 +417,7 @@ class IntASTnode : public ASTnode {
 
 public:
   IntASTnode(TOKEN tok, int val) : Val(val), Tok(tok) {}
-  virtual Value *codegen() override {}
+  virtual Value *codegen() override;
   virtual std::string to_string() const override {
     indentation = indentation + "   ";
     std::string ret = "\n"+indentation+"├── "+"IntegerLiteral 'int', value: "+std::to_string(Val);
@@ -434,7 +434,7 @@ class FloatASTnode : public ASTnode {
 
 public:
   FloatASTnode(TOKEN tok, float val) : Val(val), Tok(tok) {}
-  virtual Value *codegen() override {}
+  virtual Value *codegen() override;
   virtual std::string to_string() const override {
     indentation = indentation + "   ";
     std::string ret = "\n"+indentation+"├── "+"FloatLiteral 'float', value: "+std::to_string(Val);
@@ -451,7 +451,7 @@ class BoolASTnode : public ASTnode {
 
 public:
   BoolASTnode(TOKEN tok, bool val) : Val(val), Tok(tok), Name(boolToString(val)) {}
-  virtual Value *codegen() override {}
+  virtual Value *codegen() override;
   virtual std::string to_string() const override {
     //return std::to_string(Val);
     indentation = indentation + "   ";
@@ -480,7 +480,7 @@ class IdentASTnode : public ASTnode {
   std::string Name;
 public:
   IdentASTnode(TOKEN tok) : Tok(tok), Name(tok.lexeme.c_str()) {}
-  virtual Value *codegen() override {}
+  virtual Value *codegen() override;
   virtual std::string to_string() const override {
     indentation = indentation + "   ";
     std::string ret = "\n"+indentation+"├── "+"FuncOrVarIdentity 'ident', value: '"+Name+"'";
@@ -488,6 +488,11 @@ public:
     return ret;
     // return Name;
   }
+
+  std::string get_id_name() const {
+    return Name;
+  }
+  // const std::string &getName() const {return Name;}
 };
 
 class NegativeASTnode : public ASTnode {
@@ -516,7 +521,7 @@ class ExpressionASTnode : public ASTnode {
 
 public:
   ExpressionASTnode(TOKEN op, std::unique_ptr<ASTnode> lhs, std::unique_ptr<ASTnode> rhs) : Op(op.lexeme.c_str()), LHS(std::move(lhs)), RHS(std::move(rhs)) {}
-  virtual Value *codegen() override {}
+  virtual Value *codegen() override;
   virtual std::string to_string() const override {
     indentation = indentation + "   ";
     std::string ret = "\n"+indentation+"├── "+"ArithmeticExpr, binary operator: '"+Op+"'";
@@ -577,9 +582,10 @@ public:
 class FunCallASTnode : public ASTnode {
   std::unique_ptr<ASTnode> Id;
   std::vector<std::unique_ptr<ASTnode>> Args;
+  std::string Callee;
 public:
-  FunCallASTnode(std::unique_ptr<ASTnode> ident_node, std::vector<std::unique_ptr<ASTnode>> args) : Id(std::move(ident_node)), Args(std::move(args)) {}
-  virtual Value *codegen() override {}
+  FunCallASTnode(std::unique_ptr<ASTnode> ident_node, std::vector<std::unique_ptr<ASTnode>> args, TOKEN tok) : Id(std::move(ident_node)), Args(std::move(args)), Callee(tok.lexeme.c_str()) {}
+  virtual Value *codegen() override;
   virtual std::string to_string() const override {
     indentation = indentation + "   ";
     std::string ret = "\n"+indentation+"├── "+"FunctionCall Expression. Function call identity: '" + Id->to_string() + "'";
@@ -608,6 +614,9 @@ public:
     indentation.resize(indentation.size()-3);
     return ret;
     // return Type+" ";
+  }
+  std::string get_var_type() const {
+    return Type;
   }
 };
 
@@ -646,9 +655,9 @@ class BlockASTnode : public ASTnode {
   std::vector<std::unique_ptr<ASTnode>> Stmts;
 public:
   BlockASTnode(std::vector<std::unique_ptr<ASTnode>> decls, std::vector<std::unique_ptr<ASTnode>> stmts) : Decls(std::move(decls)), Stmts(std::move(stmts)) {}
-  virtual Value *codegen() override {}
+  virtual Value *codegen() override;
   virtual std::string to_string() const override {
-    indentation = indentation + "   ";
+    // indentation = indentation + "   ";
     std::string ret = "\n"+indentation+"├── "+"BlockExpression: ";
     if (Decls.size()>0) {
       indentation = indentation + "   ";
@@ -666,7 +675,7 @@ public:
       }
       indentation.resize(indentation.size()-3);
     }
-    indentation.resize(indentation.size()-3);
+    // indentation.resize(indentation.size()-3);
     return ret;
   }
 };
@@ -761,84 +770,39 @@ public:
 };
 
 class ParamASTnode : public ASTnode {
-  std::unique_ptr<ASTnode> Type;
-  std::unique_ptr<ASTnode> Id;
+  std::unique_ptr<VarTypeASTnode> Type;
+  std::unique_ptr<IdentASTnode> Id;
 public:
-  ParamASTnode(std::unique_ptr<ASTnode> type, std::unique_ptr<ASTnode> ident_node) : Type(std::move(type)), Id(std::move(ident_node)) {}
+  ParamASTnode(std::unique_ptr<VarTypeASTnode> type, std::unique_ptr<IdentASTnode> ident_node) : Type(std::move(type)), Id(std::move(ident_node)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
     indentation = indentation + "   ";
-    std::string ret = "\n" +indentation +"├── "+"Parameter of Function: " + Type->to_string() + Id->to_string().c_str();
-    indentation.resize(indentation.size()-3);
-    return ret;
-    // return std::string(Type->to_string().c_str())+Id;
-  }
-};
-
-class FuncDeclASTnode : public ASTnode {
-  std::vector<std::unique_ptr<ASTnode>> Params;
-  std::unique_ptr<ASTnode> Block;
-public:
-  FuncDeclASTnode(std::vector<std::unique_ptr<ASTnode>> params, std::unique_ptr<ASTnode> block) : Params(std::move(params)), Block(std::move(block)) {}
-  virtual Value *codegen() override {}
-  virtual std::string to_string() const override {
-    std::string ret = "";
-    if (Params.size()>0) {
-      indentation = indentation + "   ";
-      ret = ret + "\n"+indentation+"├── "+"Parameters:";
-      for(unsigned i=0; i<Params.size(); i++) {
-        ret = ret + Params.at(i)->to_string().c_str();
-      }
-      indentation.resize(indentation.size()-3);
+    std::string ret = "\n" +indentation +"├── "+"Parameter of Function: ";
+    if (Type->get_var_type().compare("void")==0) {
+      ret = ret + Type->to_string();
+    } else {
+      ret = ret + Type->to_string() + Id->to_string().c_str();
     }
-    indentation = indentation + "   ";
-    ret = ret + "\n"+indentation+"├── "+"Function Block: " + Block->to_string().c_str();
+
     indentation.resize(indentation.size()-3);
     return ret;
   }
-};
-
-class FuncASTnode : public ASTnode {
-  std::unique_ptr<ASTnode> Type;
-  std::unique_ptr<ASTnode> Id;
-  std::unique_ptr<ASTnode> FuncDecl;
-public:
-  FuncASTnode(std::unique_ptr<ASTnode> type, std::unique_ptr<ASTnode> tok, std::unique_ptr<ASTnode> func_decl) : Type(std::move(type)), Id(std::move(tok)), FuncDecl(std::move(func_decl)) {}
-  virtual Value *codegen() override {}
-  virtual std::string to_string() const override {
-    indentation = indentation + "   ";
-    std::string ret = "\n" +indentation+ "├── "+"Function: "+Type->to_string() + Id->to_string().c_str() + FuncDecl->to_string().c_str();
-    indentation.resize(indentation.size()-3);
-    return ret;
-    // return std::string(Type->to_string().c_str())+Id+std::string(FuncDecl->to_string().c_str());
+  std::string get_type() const {
+    return Type->get_var_type();
+  }
+  std::string get_name() const {
+    return Id->get_id_name();
   }
 };
 
-class VarASTnode : public ASTnode {
-  std::unique_ptr<ASTnode> Type;
-  std::unique_ptr<ASTnode> Id;
-  std::unique_ptr<ASTnode> Semicol;
+class PrototypeAST {
+  std::unique_ptr<VarTypeASTnode> Type;
+  std::unique_ptr<IdentASTnode> Id;
+  std::vector<std::unique_ptr<ParamASTnode>> Params;
 public:
-  VarASTnode(std::unique_ptr<ASTnode> type, std::unique_ptr<ASTnode> tok, std::unique_ptr<ASTnode> semicol) : Type(std::move(type)), Id(std::move(tok)), Semicol(std::move(semicol)) {}
-  virtual Value *codegen() override {}
-  virtual std::string to_string() const override {
-    indentation = indentation + "   ";
-    std::string ret = "\n "+indentation+ "├── "+"VariableDef: " + Type->to_string() + Id->to_string().c_str();
-    // return Type->to_string().c_str()+Id+Semicol->to_string().c_str();
-    indentation.resize(indentation.size()-3);
-    return ret;
-  }
-};
-
-class ExternASTnode : public ASTnode {
-  std::unique_ptr<ASTnode> Type;
-  std::unique_ptr<ASTnode> Id;
-  std::vector<std::unique_ptr<ASTnode>> Params;
-public:
-  ExternASTnode(std::unique_ptr<ASTnode> type, std::unique_ptr<ASTnode> tok, std::vector<std::unique_ptr<ASTnode>> params) : Type(std::move(type)), Id(std::move(tok)), Params(std::move(params)) {}
-  virtual Value *codegen() override {}
-  virtual std::string to_string() const override {
-    std::string ret = "\n"+indentation+"├── "+"ExternFunctionDef: " + Type->to_string() + Id->to_string().c_str();
+  PrototypeAST(std::unique_ptr<VarTypeASTnode> type, std::unique_ptr<IdentASTnode> id, std::vector<std::unique_ptr<ParamASTnode>> params) : Type(std::move(type)), Id(std::move(id)), Params(std::move(params)) {}
+  std::string to_string () const {
+    std::string ret = "\n"+indentation+"├── "+"FuncPrototype: " + Type->to_string() + Id->to_string().c_str();
     if (Params.size()>0) {
       indentation = indentation + "   ";
       ret = ret + "\n" + indentation + "├── "+"Parameters:";
@@ -847,16 +811,38 @@ public:
       }
       indentation.resize( indentation.size()-3 );
     }
-
     return ret;
   }
+  std::string get_type() const {
+    return Type->get_var_type();
+  }
+  std::string get_name() const {
+    return Id->get_id_name();
+  }
+  Function *codegen();
+};
+
+class FunctionAST {
+  std::unique_ptr<PrototypeAST> Prototype;
+  std::unique_ptr<ASTnode> Body;
+public:
+  FunctionAST(std::unique_ptr<PrototypeAST> prot, std::unique_ptr<ASTnode> body) : Prototype(std::move(prot)), Body(std::move(body)) {}
+  std::string to_string() const {
+    std::string ret = "\n"+indentation+"├── "+"Function: ";
+    indentation = indentation + "   ";
+    ret = ret + Prototype->to_string();
+    ret = ret + Body->to_string().c_str();
+    indentation.resize( indentation.size()-3 );
+    return ret;
+  }
+  Function *codegen();
 };
 
 class ProgramASTnode : public ASTnode {
-  std::vector<std::unique_ptr<ASTnode>> ExtrnList;
-  std::vector<std::unique_ptr<ASTnode>> DeclList;
+  std::vector<std::unique_ptr<PrototypeAST>> ExtrnList;
+  std::vector<std::unique_ptr<FunctionAST>> DeclList;
 public:
-  ProgramASTnode(std::vector<std::unique_ptr<ASTnode>> extrn, std::vector<std::unique_ptr<ASTnode>> decl) : ExtrnList(std::move(extrn)), DeclList(std::move(decl)) {}
+  ProgramASTnode(std::vector<std::unique_ptr<PrototypeAST>> extrn, std::vector<std::unique_ptr<FunctionAST>> decl) : ExtrnList(std::move(extrn)), DeclList(std::move(decl)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
     std::string ret;
@@ -880,6 +866,9 @@ public:
     return ret;
   }
 };
+
+
+
 
 /* add other AST nodes as nessasary */
 
@@ -905,15 +894,21 @@ static std::vector<std::unique_ptr<ASTnode>> ParseStmtList();
 static std::vector<std::unique_ptr<ASTnode>> ParseLocalDecls();
 static std::unique_ptr<ASTnode> ParseBlock();
 static std::unique_ptr<ASTnode> ParseElseStmt();
-static std::unique_ptr<ASTnode> ParseParam();
-static std::vector<std::unique_ptr<ASTnode>> ParseParamList();
-static std::vector<std::unique_ptr<ASTnode>> ParseParams();
+static std::unique_ptr<ParamASTnode> ParseParam();
+static std::vector<std::unique_ptr<ParamASTnode>> ParseParamList();
+static std::vector<std::unique_ptr<ParamASTnode>> ParseParams();
 static std::unique_ptr<ASTnode> ParseFuncDecl();
 static std::vector<std::unique_ptr<ASTnode>> ParseDeclList();
 static std::unique_ptr<ASTnode> ParseDecl();
 static std::unique_ptr<ASTnode> ParseExtern();
 static std::vector<std::unique_ptr<ASTnode>> ParseExternList();
 static std::unique_ptr<ASTnode> LogError(const char *Str);
+static std::unique_ptr<PrototypeAST> ParseExtern2();
+static std::vector<std::unique_ptr<PrototypeAST>> ParseExternList2();
+static std::vector<std::unique_ptr<PrototypeAST>> ParseExternListPrime2();
+static std::unique_ptr<PrototypeAST> ParsePrototype();
+static std::unique_ptr<FunctionAST> ParseFunction();
+static std::vector<std::unique_ptr<FunctionAST>> ParseFunctionsList();
 
 /* Add function calls for each production */
 
@@ -921,13 +916,13 @@ static std::unique_ptr<ASTnode> LogError(const char *Str);
 static std::unique_ptr<ASTnode> parser() {
   // add body
   if (CurTok.type == EXTERN) {
-    auto extern_list = ParseExternList();
+    auto extern_list = ParseExternList2();
     int t = CurTok.type;
     if ((t != VOID_TOK) && (t != INT_TOK) && (t != FLOAT_TOK) && (t != BOOL_TOK)) {
       LogError("ERROR. Missing function type.");
     }
-    auto decl_list = ParseDeclList();
-    auto Result = std::make_unique<ProgramASTnode>(std::move(extern_list), std::move(decl_list));
+    auto funcs_list = ParseFunctionsList();
+    auto Result = std::make_unique<ProgramASTnode>(std::move(extern_list), std::move(funcs_list));
     return std::move(Result);
 
   } else {
@@ -935,11 +930,62 @@ static std::unique_ptr<ASTnode> parser() {
     if ((t != VOID_TOK) && (t != INT_TOK) && (t != FLOAT_TOK) && (t != BOOL_TOK)) {
       LogError("ERROR. Missing function type.");
     }
-    std::vector<std::unique_ptr<ASTnode>> empty_list;
-    auto decl_list = ParseDeclList();
-    auto Result = std::make_unique<ProgramASTnode>(std::move(empty_list), std::move(decl_list));
+    std::vector<std::unique_ptr<PrototypeAST>> empty_list;
+    auto funcs_list = ParseFunctionsList();
+    auto Result = std::make_unique<ProgramASTnode>(std::move(empty_list), std::move(funcs_list));
     return std::move(Result);
   }
+
+}
+
+static std::vector<std::unique_ptr<FunctionAST>> ParseFunctionsListPrime() {
+  std::vector<std::unique_ptr<FunctionAST>> funcs_list_prime;
+
+  int t = CurTok.type;
+  while ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK) || (t==VOID_TOK)) {
+    auto func = ParseFunction();
+    if (func) {
+      funcs_list_prime.push_back(std::move(func));
+    }
+    t = CurTok.type;
+  }
+
+  if (t == EOF_TOK) {
+    return funcs_list_prime;
+  }
+
+  LogError("ERROR. Missing function type.");
+
+  return funcs_list_prime;
+
+}
+
+
+static std::vector<std::unique_ptr<FunctionAST>> ParseFunctionsList() {
+  std::vector<std::unique_ptr<FunctionAST>> funcs_list;
+
+  auto func = ParseFunction();
+  if (func) {
+    // func->codegen() etc
+    auto *FuncIR = func->codegen();
+    funcs_list.push_back(std::move(func));
+    auto funcs_list_prime = ParseFunctionsListPrime();
+    for(unsigned i=0; i<funcs_list_prime.size(); i++){
+      funcs_list.push_back(std::move(funcs_list_prime.at(i)));
+    }
+  }
+  return funcs_list;
+}
+
+static std::unique_ptr<FunctionAST> ParseFunction() {
+  auto Proto = ParsePrototype();
+  auto block = ParseBlock();
+  auto Result = std::make_unique<FunctionAST>(std::move(Proto), std::move(block));
+
+  if (Result) {
+    //Result->codegen() etc;
+  }
+  return std::move(Result);
 
 }
 
@@ -949,13 +995,15 @@ static std::unique_ptr<ASTnode> LogError(const char *Str) {
   // return nullptr;
 }
 
-static std::vector<std::unique_ptr<ASTnode>> ParseExternListPrime() {
-  std::vector<std::unique_ptr<ASTnode>> extern_list_prime;
+static std::vector<std::unique_ptr<PrototypeAST>> ParseExternListPrime2() {
+  std::vector<std::unique_ptr<PrototypeAST>> extern_list_prime;
 
   int t = CurTok.type;
   while (t == EXTERN) {
-    auto ext = ParseExtern();
+    auto ext = ParseExtern2();
     if (ext) {
+      // ext->codegen() etc
+      auto *ExternIR = ext->codegen();
       extern_list_prime.push_back(std::move(ext));
     }
     t = CurTok.type;
@@ -964,13 +1012,15 @@ static std::vector<std::unique_ptr<ASTnode>> ParseExternListPrime() {
   return extern_list_prime;
 }
 
-static std::vector<std::unique_ptr<ASTnode>> ParseExternList() {
-  std::vector<std::unique_ptr<ASTnode>> extern_list;
+static std::vector<std::unique_ptr<PrototypeAST>> ParseExternList2() {
+  std::vector<std::unique_ptr<PrototypeAST>> extern_list;
 
-  auto ext = ParseExtern();
+  auto ext = ParseExtern2();
   if (ext) {
+    // ext->codegen() etc
+    auto *ExternIR = ext->codegen();
     extern_list.push_back(std::move(ext));
-    auto extern_list_prime = ParseExternListPrime();
+    auto extern_list_prime = ParseExternListPrime2();
     for(unsigned i=0; i<extern_list_prime.size(); i++) {
       extern_list.push_back(std::move(extern_list_prime.at(i)));
     }
@@ -978,173 +1028,70 @@ static std::vector<std::unique_ptr<ASTnode>> ParseExternList() {
   return extern_list;
 }
 
-static std::unique_ptr<ASTnode> ParseExtern() {
+static std::unique_ptr<PrototypeAST> ParseExtern2() {
   if (CurTok.type == EXTERN) {
     getNextToken();
-    int t = CurTok.type;
-    if ((t==VOID_TOK) || (t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK)) {
-      auto type = std::make_unique<VarTypeASTnode>(CurTok);
-      getNextToken();
+    auto prototype =  ParsePrototype();
 
-      if (CurTok.type == IDENT) {
-        TOKEN ident = CurTok;
-        auto ident_node = std::make_unique<IdentASTnode>(CurTok);
-        getNextToken();
-        if (CurTok.type != LPAR) {
-          LogError("ERROR. missing left parantheses for exter function.");
-        }
-
-        getNextToken();
-        auto params = ParseParams();
-
-        if (CurTok.type != RPAR) {
-          LogError("ERROR. missing right parantheses for extern function.");
-        }
-
-        getNextToken();
-        if (CurTok.type != SC) {
-          LogError("ERROR. missing semicolon for exter function.");
-        }
-
-        auto Result = std::make_unique<ExternASTnode>(std::move(type),std::move(ident_node),std::move(params));
-        getNextToken();
-        return std::move(Result);
-
-      }else {
-        LogError("ERROR. missing identity for extern function.");
-      }
-
-    } else {
-      LogError("ERROR. Missing type of extern function.");
+    if (CurTok.type != SC) {
+      LogError("ERROR. missing semicolon for extern function.");
     }
+    getNextToken();
+    return std::move(prototype);
 
   }
   return nullptr;
 }
 
-static std::vector<std::unique_ptr<ASTnode>> ParseDeclListPrime() {
-  std::vector<std::unique_ptr<ASTnode>> decl_list_prime;
+static std::unique_ptr<PrototypeAST> ParsePrototype() {
 
   int t = CurTok.type;
-  while ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK) || (t==VOID_TOK)) {
-    auto decl = ParseDecl();
-    if (decl) {
-      decl_list_prime.push_back(std::move(decl));
-    }
-    t = CurTok.type;
-  }
-
-  if (t == EOF_TOK) {
-    return decl_list_prime;
-  }
-
-  LogError("ERROR. Missing function type.");
-
-  return decl_list_prime;
-
-}
-
-static std::vector<std::unique_ptr<ASTnode>> ParseDeclList() {
-  std::vector<std::unique_ptr<ASTnode>> decl_list;
-
-  auto decl = ParseDecl();
-  if (decl) {
-    decl_list.push_back(std::move(decl));
-    auto decl_list_prime = ParseDeclListPrime();
-    for(unsigned i=0; i<decl_list_prime.size(); i++){
-      decl_list.push_back(std::move(decl_list_prime.at(i)));
-    }
-  }
-  return decl_list;
-}
-
-static std::unique_ptr<ASTnode> ParseDecl() {
-  int t = CurTok.type;
-  if (t == VOID_TOK) {
+  if ((t==VOID_TOK) || (t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK)) {
     auto type = std::make_unique<VarTypeASTnode>(CurTok);
     getNextToken();
 
     if (CurTok.type == IDENT) {
       TOKEN ident = CurTok;
+      auto ident_node = std::make_unique<IdentASTnode>(CurTok);
       getNextToken();
-      auto ident_node = std::make_unique<IdentASTnode>(ident);
-      auto func_decl = ParseFuncDecl();
-      auto Result = std::make_unique<FuncASTnode>(std::move(type), std::move(ident_node), std::move(func_decl));
+      if (CurTok.type != LPAR) {
+        LogError("ERROR. missing left parantheses for extern function.");
+      }
+
+      getNextToken();
+      auto params = ParseParams();
+
+      if (CurTok.type != RPAR) {
+        LogError("ERROR. missing right parantheses for extern function.");
+      }
+
+      auto Result = std::make_unique<PrototypeAST>(std::move(type),std::move(ident_node),std::move(params));
+      getNextToken();
       return std::move(Result);
 
-    }
-    else {
-      LogError("ERROR. missing identity of function.");
-    }
-  }
-  else if ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK)) {
-    auto type = std::make_unique<VarTypeASTnode>(CurTok);
-    getNextToken();
-
-    if (CurTok.type == IDENT) {
-      TOKEN ident = CurTok;
-      auto ident_node = std::make_unique<IdentASTnode>(ident);
-      getNextToken();
-      if (CurTok.type == SC) {
-        auto semicol = std::make_unique<SemicolASTnode>(CurTok);
-        auto Result = std::make_unique<VarASTnode>(std::move(type), std::move(ident_node), std::move(semicol));
-        getNextToken();
-        return std::move(Result);
-      }
-      else if (CurTok.type == LPAR) {
-        auto func_decl = ParseFuncDecl();
-        auto Result = std::make_unique<FuncASTnode>(std::move(type), std::move(ident_node), std::move(func_decl));
-        return std::move(Result);
-
-      } else {
-        LogError("ERROR. Missing left parantheses for function declaration or semicolumn for variable declaration.");
-      }
-
-
-    } else {
-      LogError("ERROR. missing identity of function.");
+    }else {
+      LogError("ERROR. missing identity for extern function.");
     }
 
   } else {
-    LogError("ERROR. Missing function type.");
-  }
-
-  return nullptr;
-}
-
-static std::unique_ptr<ASTnode> ParseFuncDecl() {
-  if (CurTok.type == LPAR) {
-    getNextToken();
-    int t = CurTok.type;
-    auto params = ParseParams();
-
-    if (CurTok.type == RPAR) {
-      getNextToken();
-      auto block = ParseBlock();
-      auto Result = std::make_unique<FuncDeclASTnode>(std::move(params), std::move(block));
-      return std::move(Result);
-
-    } else {
-      LogError("ERROR. Missing right parantheses in function declaration.");
-    }
-
-  } else {
-    LogError("ERROR. Missing left parantheses for function declaration.");
+    LogError("ERROR. Missing type of extern function.");
   }
   return nullptr;
+
 }
 
-static std::vector<std::unique_ptr<ASTnode>> ParseParams() {
-  std::vector<std::unique_ptr<ASTnode>> params;
+static std::vector<std::unique_ptr<ParamASTnode>> ParseParams() {
+  std::vector<std::unique_ptr<ParamASTnode>> params;
   int t = CurTok.type;
   if ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK)) {
     params = ParseParamList();
     return params;
 
   } else if (t == VOID_TOK) {
-    auto void_type = std::make_unique<VoidASTnode>(CurTok);
+    auto void_type = std::make_unique<VarTypeASTnode>(CurTok);
+    auto param = std::make_unique<ParamASTnode>(std::move(void_type), nullptr);
     getNextToken();
-    params.push_back(std::move(void_type));
+    params.push_back(std::move(param));
     return params;
 
   } else {
@@ -1158,8 +1105,8 @@ static std::vector<std::unique_ptr<ASTnode>> ParseParams() {
   return params;
 }
 
-static std::vector<std::unique_ptr<ASTnode>> ParseParamListPrime() {
-  std::vector<std::unique_ptr<ASTnode>> param_list_prime;
+static std::vector<std::unique_ptr<ParamASTnode>> ParseParamListPrime() {
+  std::vector<std::unique_ptr<ParamASTnode>> param_list_prime;
 
   int i = CurTok.type;
   while (i == COMMA) {
@@ -1179,8 +1126,8 @@ static std::vector<std::unique_ptr<ASTnode>> ParseParamListPrime() {
 
 }
 
-static std::vector<std::unique_ptr<ASTnode>> ParseParamList() {
-  std::vector<std::unique_ptr<ASTnode>> param_list;
+static std::vector<std::unique_ptr<ParamASTnode>> ParseParamList() {
+  std::vector<std::unique_ptr<ParamASTnode>> param_list;
 
   auto param = ParseParam();
   if (param) {
@@ -1193,7 +1140,7 @@ static std::vector<std::unique_ptr<ASTnode>> ParseParamList() {
   return param_list;
 }
 
-static std::unique_ptr<ASTnode> ParseParam() {
+static std::unique_ptr<ParamASTnode> ParseParam() {
   int t = CurTok.type;
   if ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK)) {
     auto type = std::make_unique<VarTypeASTnode>(CurTok);
@@ -1702,7 +1649,6 @@ static std::unique_ptr<ASTnode> Rval5Expr() {
   return nullptr;
 }
 
-
 static std::unique_ptr<ASTnode> Rval6Expr() {
   int t = CurTok.type;
 
@@ -1766,7 +1712,7 @@ static std::unique_ptr<ASTnode> Rval7Expr() {
       getNextToken();
       auto arg_list = ParseArgsList();
 
-      auto Result = std::make_unique<FunCallASTnode>(std::move(ident), std::move(arg_list));
+      auto Result = std::make_unique<FunCallASTnode>(std::move(ident), std::move(arg_list), identTok);
       getNextToken();
       return std::move(Result);
 
@@ -1852,6 +1798,155 @@ static std::unique_ptr<ASTnode> ParseArg() {
 static LLVMContext TheContext;
 static IRBuilder<> Builder(TheContext);
 static std::unique_ptr<Module> TheModule;
+static std::map<std::string, Value*> NamedValues;
+// static std::map<std::string, Value*> GlobalNamedValues;
+
+Value *LogErrorV(const char *Str) {
+  fprintf(stderr, "\nLogError: \n%s\n\n", Str);
+  return nullptr;
+}
+
+Value *IntASTnode::codegen() {
+  return ConstantInt::get(TheContext, APInt(32, Val, false));
+}
+
+Value *FloatASTnode::codegen() {
+  return ConstantFP::get(TheContext, APFloat(Val));
+}
+
+Value *BoolASTnode::codegen() {
+  return ConstantInt::get(TheContext, APInt(1, Val, false));
+}
+
+Value *IdentASTnode::codegen() {
+  Value *V = NamedValues[Name];
+  if (!V) {
+    LogErrorV("Unknown variable name");
+  }
+
+  return V;
+}
+
+Value *ExpressionASTnode::codegen() {
+  fprintf(stderr, "CODEGEN ExprAST\n");
+  Value *L = LHS->codegen();
+  Value *R = RHS->codegen();
+  if (!L || !R) {
+    return nullptr;
+  }
+
+  if (Op.compare("+")==0) {
+    return Builder.CreateFAdd(L, R, "addtmp");
+  }
+
+  return LogErrorV("invalid binary operator");
+}
+
+Value *FunCallASTnode::codegen() {
+  Function *CalleeF = TheModule->getFunction(Callee);
+  if (!CalleeF) {
+    return LogErrorV("Unknown function referenced");
+  }
+
+  if (CalleeF->arg_size() != Args.size()) {
+    return LogErrorV("Incorrect number of arguments passed");
+  }
+
+  std::vector<Value *> ArgsV;
+  for(unsigned i = 0; i < Args.size(); i++) {
+    ArgsV.push_back(Args[i]->codegen());
+    if (!ArgsV.back()) {
+      return nullptr;
+    }
+  }
+  return Builder.CreateCall(CalleeF, ArgsV, "calltmp");
+}
+
+Function *PrototypeAST::codegen() {
+  std::vector<llvm::Type*> Parameters;
+  llvm::Type* param_type;
+  for(unsigned i=0; i<Params.size(); i++) {
+    if (std::string(Params.at(i)->get_type()).compare("int")==0) {
+      param_type = Type::getInt32Ty(TheContext);
+
+    } else if (std::string(Params.at(i)->get_type()).compare("float")==0) {
+      param_type = Type::getFloatTy(TheContext);
+
+    } else if (std::string(Params.at(i)->get_type()).compare("bool")==0) {
+      param_type = Type::getInt1Ty(TheContext);
+
+    } else if (std::string(Params.at(i)->get_type()).compare("void")==0) {
+      param_type = Type::getVoidTy(TheContext);
+
+    }
+    Parameters.push_back(param_type);
+  }
+
+  FunctionType *FT;
+
+  if (get_type().compare("int")==0) {
+    FT = FunctionType::get(Type::getInt32Ty(TheContext), Parameters, false);
+
+  } else if (get_type().compare("float")==0) {
+    FT = FunctionType::get(Type::getFloatTy(TheContext), Parameters, false);
+
+  } else if (get_type().compare("bool")==0) {
+    FT = FunctionType::get(Type::getInt1Ty(TheContext), Parameters, false);
+
+  } else if (get_type().compare("void")==0) {
+    FT = FunctionType::get(Type::getVoidTy(TheContext), Parameters, false);
+  }
+
+  std::string Name = get_name();
+  Function *F = Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
+
+  unsigned Idx = 0;
+  for (auto &Arg : F->args()) {
+    Arg.setName(Params.at(Idx)->get_name());
+    Idx++;
+  }
+
+  return F;
+}
+
+Function *FunctionAST::codegen() {
+  Function *TheFunction = TheModule->getFunction(Prototype->get_name());
+
+  if (!TheFunction) {
+    TheFunction = Prototype->codegen();
+  }
+
+  if (!TheFunction) {
+    return nullptr;
+  }
+
+  if (!TheFunction->empty()) {
+    return (Function*)LogErrorV("Function cannot be redefined.");
+  }
+
+  BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
+  Builder.SetInsertPoint(BB);
+
+  NamedValues.clear();
+  for(auto &Arg : TheFunction->args()) {
+    NamedValues[Arg.getName()] = &Arg;
+  }
+
+  if (Value *RetVal = Body->codegen()) {
+    Builder.CreateRet(RetVal);
+
+    verifyFunction(*TheFunction);
+
+    return TheFunction;
+  }
+
+  TheFunction->eraseFromParent();
+  return nullptr;
+}
+
+Value *BlockASTnode::codegen() {
+  return nullptr;
+}
 
 //===----------------------------------------------------------------------===//
 // AST Printer
@@ -1917,7 +2012,8 @@ int main(int argc, char **argv) {
   fprintf(stderr, "Parsing Finished\n");
 
 
-  llvm::outs() << *ASTree << "\n";
+  llvm::outs() << *ASTree << "\n\n";
+
 
 
 
