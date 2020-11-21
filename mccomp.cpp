@@ -503,7 +503,7 @@ class NegativeASTnode : public ASTnode {
 
 public:
   NegativeASTnode(TOKEN tok, char op, std::unique_ptr<ASTnode> expr) : Op(op), Tok(tok), Expr(std::move(expr)) {}
-  virtual Value *codegen() override {}
+  virtual Value *codegen() override;
   virtual std::string to_string() const override {
     indentation = indentation + "   ";
     std::string ret = "\n"+indentation+"├── "+"NegOfExpression, prefix: '" + std::string(1, Op) +"'"+Expr->to_string().c_str()+std::string(1,')');
@@ -539,7 +539,7 @@ class ExprEnclosedASTnode : public ASTnode {
 
 public:
   ExprEnclosedASTnode(std::unique_ptr<ASTnode> expr) : Expr(std::move(expr)) {}
-  virtual Value *codegen() override {}
+  virtual Value *codegen() override;
   virtual std::string to_string() const override {
     indentation = indentation + "   ";
     std::string ret = "\n"+indentation+"├── "+"Expression in parantheses: " + Expr->to_string();
@@ -562,12 +562,12 @@ public:
 };
 
 class AssignASTnode : public ASTnode {
-  std::unique_ptr<ASTnode> Id;
+  std::unique_ptr<IdentASTnode> Id;
   std::unique_ptr<ASTnode> Assignment;
 
 public:
-  AssignASTnode(std::unique_ptr<ASTnode> ident_node, std::unique_ptr<ASTnode> assignment) : Id(std::move(ident_node)), Assignment(std::move(assignment)) {}
-  virtual Value *codegen() override {}
+  AssignASTnode(std::unique_ptr<IdentASTnode> ident_node, std::unique_ptr<ASTnode> assignment) : Id(std::move(ident_node)), Assignment(std::move(assignment)) {}
+  virtual Value *codegen() override;
   virtual std::string to_string() const override {
     indentation = indentation + "   ";
     std::string ret = "\n"+indentation+"├── "+"AssignmentExpr, binary operator: '" + std::string(1,'=') + "'";
@@ -709,7 +709,7 @@ class IfASTnode : public ASTnode {
   std::unique_ptr<ASTnode> Else;
 public:
   IfASTnode(std::unique_ptr<ASTnode> expr, std::unique_ptr<ASTnode> block, std::unique_ptr<ASTnode> else_stmt) : Expr(std::move(expr)), Block(std::move(block)), Else(std::move(else_stmt)) {}
-  virtual Value *codegen() override {}
+  virtual Value *codegen() override;
   virtual std::string to_string() const override {
 
     indentation = indentation + "   ";
@@ -734,7 +734,7 @@ class ElseASTnode : public ASTnode {
   std::unique_ptr<ASTnode> Block;
 public:
   ElseASTnode(std::unique_ptr<ASTnode> block) : Block(std::move(block)) {}
-  virtual Value *codegen() override {}
+  virtual Value *codegen() override;
   virtual std::string to_string() const override {
     indentation = indentation + "   ";
     std::string ret = "\n"+indentation+"├── "+"ElseBlock of If statement: " + Block->to_string();
@@ -750,7 +750,7 @@ class ReturnASTnode : public ASTnode {
   std::unique_ptr<ASTnode> Semicol;
 public:
   ReturnASTnode(std::unique_ptr<ASTnode> expr, std::unique_ptr<ASTnode> semicol) : Expr(std::move(expr)), Semicol(std::move(semicol)) {}
-  virtual Value *codegen() override {}
+  virtual Value *codegen() override;
   virtual std::string to_string() const override {
     indentation = indentation + "   ";
     std::string ret = "\n" +indentation+"├── "+"ReturnStatement";
@@ -774,7 +774,7 @@ class ParamASTnode : public ASTnode {
   std::unique_ptr<IdentASTnode> Id;
 public:
   ParamASTnode(std::unique_ptr<VarTypeASTnode> type, std::unique_ptr<IdentASTnode> ident_node) : Type(std::move(type)), Id(std::move(ident_node)) {}
-  virtual Value *codegen() override {}
+  virtual Value *codegen() override;
   virtual std::string to_string() const override {
     indentation = indentation + "   ";
     std::string ret = "\n" +indentation +"├── "+"Parameter of Function: ";
@@ -855,7 +855,8 @@ public:
       }
       indentation.resize( indentation.size()-3 );
     }
-    if (Globals.size()>0) {
+    if (Globals.at(0)) {
+      fprintf(stderr, "CIA SEDI\n");
       ret = ret + "\n"+"├── "+"GlobalVarsDeclarations: ";
       for(unsigned i=0; i<Globals.size(); i++) {
         ret = ret + Globals.at(i)->to_string().c_str();
@@ -895,7 +896,7 @@ static std::unique_ptr<ASTnode> ParseExprStmt();
 static std::unique_ptr<ASTnode> ParseArg();
 static std::vector<std::unique_ptr<ASTnode>> ParseArgsList();
 static std::vector<std::unique_ptr<ASTnode>> ParseArgsListPrime();
-static std::unique_ptr<ASTnode> ParseVarType();
+static std::unique_ptr<VarTypeASTnode> ParseVarType();
 static std::unique_ptr<ASTnode> ParseLocalDecl();
 static std::unique_ptr<ASTnode> ParseStmt();
 static std::vector<std::unique_ptr<ASTnode>> ParseStmtList();
@@ -1393,7 +1394,8 @@ static std::unique_ptr<ASTnode> ParseLocalDecl() {
         auto ident_node = std::make_unique<IdentASTnode>(ident);
         auto semicol = std::make_unique<SemicolASTnode>(CurTok);
 
-        auto Result = std::make_unique<LocalDeclASTnode>(std::move(var_type),std::move(ident_node),std::move(semicol));
+        // auto Result = std::make_unique<LocalDeclASTnode>(std::move(var_type),std::move(ident_node),std::move(semicol));
+        auto Result = std::make_unique<ParamASTnode>(std::move(var_type), std::move(ident_node));
         getNextToken();
         return std::move(Result);
 
@@ -1413,7 +1415,7 @@ static std::unique_ptr<ASTnode> ParseLocalDecl() {
 
 }
 
-static std::unique_ptr<ASTnode> ParseVarType() {
+static std::unique_ptr<VarTypeASTnode> ParseVarType() {
   int t = CurTok.type;
   if ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK)) {
     auto var_type = std::make_unique<VarTypeASTnode>(CurTok);
@@ -1506,15 +1508,14 @@ static std::unique_ptr<ASTnode> ParseExprStmt() {
 
   //expand by expr_stmt ::= expr
   if ((t==INT_LIT) || (t==FLOAT_LIT) || (t==BOOL_LIT) || (t==MINUS) || (t==NOT) || (t==IDENT) || (t==LPAR)) {
-    auto expr_parsed = ParseExpr();
+    auto Expr_parsed = ParseExpr();
 
     t = CurTok.type;
     if (t==SC) {
       auto semicol = std::make_unique<SemicolASTnode>(CurTok);
-      if (expr_parsed) {
-        auto Result = std::make_unique<ExprSemicolASTnode>(std::move(expr_parsed),std::move(semicol));
+      if (Expr_parsed) {
         getNextToken();
-        return std::move(Result);
+        return std::move(Expr_parsed);
       }
     } else {
       LogError("ERROR. Semicolon is expected after expression.");
@@ -1845,8 +1846,8 @@ static std::unique_ptr<ASTnode> ParseArg() {
 static LLVMContext TheContext;
 static IRBuilder<> Builder(TheContext);
 static std::unique_ptr<Module> TheModule;
-static std::map<std::string, Value*> NamedValues;
-// static std::map<std::string, AllocaInst*> NamedValues;
+// static std::map<std::string, Value*> NamedValues;
+static std::map<std::string, AllocaInst*> NamedValues;
 // static std::map<std::string, Value*> GlobalNamedValues;
 
 Value *LogErrorV(const char *Str) {
@@ -1854,10 +1855,10 @@ Value *LogErrorV(const char *Str) {
   return nullptr;
 }
 
-// static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::string &VarName) {
-//   IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
-//   return TmpB.CreateAlloca(Type::)
-// }
+static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::string &VarName, llvm::Type *alloca_type) {
+  IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
+  return TmpB.CreateAlloca(alloca_type, 0, VarName.c_str());
+}
 
 Value *IntASTnode::codegen() {
   return ConstantInt::get(TheContext, APInt(32, Val, false));
@@ -1877,19 +1878,83 @@ Value *IdentASTnode::codegen() {
     LogErrorV("Unknown variable name");
   }
 
-  return V;
+  return Builder.CreateLoad(V, Name.c_str());
 }
 
 Value *ExpressionASTnode::codegen() {
-  fprintf(stderr, "CODEGEN ExprAST\n");
   Value *L = LHS->codegen();
   Value *R = RHS->codegen();
   if (!L || !R) {
     return nullptr;
   }
 
+  // if (L->getType() != R->getType()) {
+  //   return LogErrorV("Types of operands does not match.");
+  // }
+
+  if ((L->getType() == Type::Type::getInt32Ty(TheContext)) && (R->getType() == Type::Type::getFloatTy(TheContext))) {
+    L = Builder.CreateSIToFP(L, Type::getFloatTy(TheContext));
+  } else if ((R->getType() == Type::Type::getInt32Ty(TheContext)) && (L->getType() == Type::Type::getFloatTy(TheContext))) {
+    R = Builder.CreateSIToFP(R, Type::getFloatTy(TheContext));
+  }
+
   if (Op.compare("+")==0) {
-    return Builder.CreateFAdd(L, R, "addtmp");
+    return Builder.CreateBinOp(Instruction::FAdd, L, R);
+    // return Builder.CreateFAdd(L, R, "addtmp");
+  } else if (Op.compare("*")==0) {
+    return Builder.CreateFMul(L, R, "addtmp");
+  } else if (Op.compare("-")==0) {
+    return Builder.CreateFSub(L, R, "subtmp");
+  } else if (Op.compare("/")==0) {
+    return Builder.CreateFDiv(L, R, "divtmp");
+  } else if (Op.compare("%")==0) {
+    return Builder.CreateFRem(L, R, "remtmp");
+  } else if (Op.compare("<")==0) {
+    if (L->getType() == Type::getInt32Ty(TheContext)) {
+      L = Builder.CreateICmpULT(L, R, "cmptmp");
+    } else if (L->getType() == Type::getFloatTy(TheContext)) {
+      L = Builder.CreateFCmpULT(L, R, "cmptmp");
+    }
+    return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),"booltmp");
+  } else if (Op.compare(">")==0) {
+    if (L->getType() == Type::getInt32Ty(TheContext)) {
+      L = Builder.CreateICmpUGT(L, R, "cmptmp");
+    } else if (L->getType() == Type::getFloatTy(TheContext)) {
+      L = Builder.CreateFCmpUGT(L, R, "cmptmp");
+    }
+    return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),"booltmp");
+  } else if (Op.compare("<=")==0) {
+    if (L->getType() == Type::getInt32Ty(TheContext)) {
+      L = Builder.CreateICmpULE(L, R, "cmptmp");
+    } else if (L->getType() == Type::getFloatTy(TheContext)) {
+      L = Builder.CreateFCmpULE(L, R, "cmptmp");
+    }
+    return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),"booltmp");
+  } else if (Op.compare(">=")==0) {
+    if (L->getType() == Type::getInt32Ty(TheContext)) {
+      L = Builder.CreateICmpUGE(L, R, "cmptmp");
+    } else if (L->getType() == Type::getFloatTy(TheContext)) {
+      L = Builder.CreateFCmpUGE(L, R, "cmptmp");
+    }
+    return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),"booltmp");
+  } else if (Op.compare("==")==0) {
+    if (L->getType() == Type::getInt32Ty(TheContext)) {
+      Value* LF = Builder.CreateSIToFP(L, Type::getFloatTy(TheContext));
+      Value* RF = Builder.CreateSIToFP(R, Type::getFloatTy(TheContext));
+      L = Builder.CreateFCmpUEQ(LF, RF, "cmptmp");
+    } else if (L->getType() == Type::getFloatTy(TheContext)) {
+      L = Builder.CreateFCmpUEQ(L, R, "cmptmp");
+    }
+    return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),"booltmp");
+  } else if (Op.compare("!=")==0) {
+    if (L->getType() == Type::getInt32Ty(TheContext)) {
+      Value* LF = Builder.CreateSIToFP(L, Type::getFloatTy(TheContext));
+      Value* RF = Builder.CreateSIToFP(R, Type::getFloatTy(TheContext));
+      L = Builder.CreateFCmpUNE(LF, RF, "cmptmp");
+    } else if (L->getType() == Type::getFloatTy(TheContext)) {
+      L = Builder.CreateFCmpUNE(L, R, "cmptmp");
+    }
+    return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),"booltmp");
   }
 
   return LogErrorV("invalid binary operator");
@@ -1980,16 +2045,40 @@ Function *FunctionAST::codegen() {
   BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
   Builder.SetInsertPoint(BB);
 
-  NamedValues.clear();
-  for(auto &Arg : TheFunction->args()) {
-    // AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, Arg.getName());
-    //
-    // Builder.CreateStore(&Arg, Alloca);
 
-    NamedValues[Arg.getName()] = &Arg;
+
+
+  NamedValues.clear();
+
+  FunctionType *FTy = TheFunction->getFunctionType();
+  unsigned i = 0;
+  for(auto &Arg : TheFunction->args()) {
+
+    llvm::Type* param_type= FTy->getParamType(i);
+    llvm::Type* alloca_type;
+    if (param_type->isIntegerTy(32)) {
+      alloca_type = Type::getInt32Ty(TheContext);
+    } else if (param_type->isIntegerTy(1)) {
+      alloca_type = Type::getInt1Ty(TheContext);
+    } else if (param_type->isFloatTy()) {
+      alloca_type = Type::getFloatTy(TheContext);
+    } else if (param_type->isVoidTy()) {
+      alloca_type = Type::getVoidTy(TheContext);
+    }
+
+    AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, Arg.getName(), alloca_type);
+
+    Builder.CreateStore(&Arg, Alloca);
+
+    NamedValues[Arg.getName()] = Alloca;
+    i++;
   }
 
   if (Value *RetVal = Body->codegen()) {
+
+    if (TheFunction->getReturnType() != RetVal->getType()) {
+      LogErrorV("Function return type does not match returning argument type.");
+    }
     Builder.CreateRet(RetVal);
 
     verifyFunction(*TheFunction);
@@ -2002,7 +2091,174 @@ Function *FunctionAST::codegen() {
 }
 
 Value *BlockASTnode::codegen() {
+  Value *V;
+  for (unsigned i=0; i<Decls.size(); i++) {
+    V = Decls.at(i)->codegen();
+  }
+
+  if (Stmts.size()==0) {
+    return V;
+  }
+  for (unsigned i=0; i<Stmts.size()-1; i++) {
+    V = Stmts.at(i)->codegen();
+    if (!V) {
+      return nullptr;
+    }
+    // Builder.CreateRet(V);
+  }
+  V = Stmts.at(Stmts.size()-1)->codegen();
+  if (!V) {
+    return nullptr;
+  }
+  return V;
+}
+
+Value *AssignASTnode::codegen() {
+  IdentASTnode *ident = dynamic_cast<IdentASTnode*>(Id.get());
+  if (!ident) {
+    return LogErrorV("destination of '=' must be a variable");
+  }
+  Value *Val = Assignment->codegen();
+  if (!Val) {
+    return nullptr;
+  }
+  Value *Variable = NamedValues[Id->get_id_name()];
+  if (!Variable) {
+    return LogErrorV("Unknown variable name");
+  }
+  Builder.CreateStore(Val, Variable);
+  return Val;
+}
+
+Value *ExprEnclosedASTnode::codegen() {
+  return Expr->codegen();
+}
+
+Value *ParamASTnode::codegen() {
+  Function *TheFunction = Builder.GetInsertBlock()->getParent();
+  std::string var_name = Id->get_id_name();
+  Value *Variable = NamedValues[var_name];
+  if (Variable) {
+    return LogErrorV("Variable with such name is already given to function as argument");
+  }
+
+  std::string var_type = Type->get_var_type();
+
+  Value *InitVal;
+  llvm::Type *alloca_type;
+  if (var_type.compare("int")==0) {
+    alloca_type = Type::getInt32Ty(TheContext);
+    InitVal = ConstantInt::get(TheContext, APInt(32, 0, false));
+  } else if (var_type.compare("float")==0) {
+    alloca_type = Type::getFloatTy(TheContext);
+    fprintf(stderr, "FLOAT INIT VAL\n");
+    float val = 0;
+    InitVal = ConstantFP::get(TheContext, APFloat(val));
+  } else if (var_type.compare("bool")==0) {
+    alloca_type = Type::getInt1Ty(TheContext);
+    InitVal = ConstantInt::get(TheContext, APInt(1, 0, false));
+  }
+
+  AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, var_name, alloca_type);
+  Builder.CreateStore(InitVal, Alloca);
+
+  NamedValues[var_name] = Alloca;
+
   return nullptr;
+}
+
+Value *ReturnASTnode::codegen() {
+  return Expr->codegen();
+}
+
+Value *NegativeASTnode::codegen() {
+  Value *Operand = Expr->codegen();
+  switch (Op) {
+    case '-':
+      if (Operand->getType() == Type::getInt1Ty(TheContext)){
+        return LogErrorV("Boolean type cannot be negative");
+      }
+      if (Operand->getType() == Type::getFloatTy(TheContext)) {
+        return Builder.CreateFNeg(Operand);
+      }
+      if (Operand->getType() == Type::getInt32Ty(TheContext)) {
+        return Builder.CreateNeg(Operand);
+      }
+      break;
+    case '!':
+      if (Operand->getType() != Type::getInt1Ty(TheContext)) {
+        return LogErrorV("Float or Integer cannot be logically negated");
+      }
+      return Builder.CreateNot(Operand);
+      break;
+  }
+  return nullptr;
+}
+
+Value *IfASTnode::codegen() {
+
+  Value *CondV = Expr->codegen();
+
+  if (!CondV) {
+    return nullptr;
+  }
+
+  CondV = Builder.CreateFCmpONE(CondV, ConstantFP::get(TheContext, APFloat(0.0)), "ifcond");
+  // CondV = Builder.CreateFCmpONE(CondV, ConstantFP::get(TheContext, APFloat(0.0)), "ifcond");
+
+  Function *TheFunction = Builder.GetInsertBlock()->getParent();
+
+  BasicBlock *ThenBB = BasicBlock::Create(TheContext, "then", TheFunction);
+
+  if(!Else) {
+    BasicBlock *MergeBB = BasicBlock::Create(TheContext, "ifcont");
+    Builder.CreateCondBr(CondV, ThenBB, MergeBB);
+    Builder.SetInsertPoint(ThenBB);
+    Value *ThenV = Block->codegen();
+    if (!ThenV) {
+      return nullptr;
+    }
+    Builder.CreateBr(MergeBB);
+    TheFunction->getBasicBlockList().push_back(MergeBB);
+    Builder.SetInsertPoint(MergeBB);
+    return CondV;
+  }
+
+  BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else");
+
+  BasicBlock *MergeBB = BasicBlock::Create(TheContext, "ifcont");
+
+  Builder.CreateCondBr(CondV, ThenBB, ElseBB);
+
+  Builder.SetInsertPoint(ThenBB);
+
+  Value *ThenV = Block->codegen();
+  if (!ThenV) {
+    return nullptr;
+  }
+
+  Builder.CreateBr(MergeBB);
+  ThenBB = Builder.GetInsertBlock();
+
+  TheFunction->getBasicBlockList().push_back(ElseBB);
+  Builder.SetInsertPoint(ElseBB);
+  fprintf(stderr, "LABADIENA\n");
+
+  Value *ElseV = Else->codegen();
+  if (!ElseV) {
+    return nullptr;
+  }
+  Builder.CreateBr(MergeBB);
+  ElseBB = Builder.GetInsertBlock();
+  TheFunction->getBasicBlockList().push_back(MergeBB);
+  Builder.SetInsertPoint(MergeBB);
+
+  return ElseV;
+}
+
+Value *ElseASTnode::codegen() {
+  fprintf(stderr, "Else Codegen\n");
+  return Block->codegen();
 }
 
 //===----------------------------------------------------------------------===//
@@ -2046,6 +2302,21 @@ int main(int argc, char **argv) {
   // Make the module, which holds all the code.
   TheModule = std::make_unique<Module>("mini-c", TheContext);
 
+  // llvm::TheFPM = std::make_unique<legacy::FunctionPassManager>(TheModule.get());
+  //
+  // // Promote allocas to registers.
+  // llvm::TheFPM->add(createPromoteMemoryToRegisterPass());
+  // // Do simple "peephole" optimizations and bit-twiddling optzns.
+  // llvm::TheFPM->add(createInstructionCombiningPass());
+  // // Reassociate expressions.
+  // llvm::TheFPM->add(createReassociatePass());
+  // // Eliminate Common SubExpressions.
+  // llvm::TheFPM->add(createGVNPass());
+  // // Simplify the control flow graph (deleting unreachable blocks, etc).
+  // llvm::TheFPM->add(createCFGSimplificationPass());
+  //
+  // llvm::TheFPM->doInitialization();
+
 
   if (argc == 2) {
     pFile = fopen(argv[1], "r");
@@ -2069,7 +2340,7 @@ int main(int argc, char **argv) {
   fprintf(stderr, "Parsing Finished\n");
 
 
-  llvm::outs() << *ASTree << "\n\n";
+  // llvm::outs() << *ASTree << "\n\n";
 
 
 

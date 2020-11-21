@@ -1,7 +1,16 @@
+extern int print_int(int X);
 
-extern int func(int a, int c);
-extern float checking(bool d, float x);
-float globalus;
-int main(int a, int b) {
-	2+3;
+int addition(int n, int m){
+	int result;
+	bool b;
+	b = 1;
+	b = !b;
+	result = -1;
+	if (1.0<2.0) {
+		result = m;
+	}
+	result = m+n;
+
+
+  return result;
 }
