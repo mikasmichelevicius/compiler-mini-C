@@ -840,9 +840,10 @@ public:
 
 class ProgramASTnode : public ASTnode {
   std::vector<std::unique_ptr<PrototypeAST>> ExtrnList;
+  std::vector<std::unique_ptr<ParamASTnode>> Globals;
   std::vector<std::unique_ptr<FunctionAST>> DeclList;
 public:
-  ProgramASTnode(std::vector<std::unique_ptr<PrototypeAST>> extrn, std::vector<std::unique_ptr<FunctionAST>> decl) : ExtrnList(std::move(extrn)), DeclList(std::move(decl)) {}
+  ProgramASTnode(std::vector<std::unique_ptr<PrototypeAST>> extrn, std::vector<std::unique_ptr<ParamASTnode>> globals, std::vector<std::unique_ptr<FunctionAST>> decl) : ExtrnList(std::move(extrn)), Globals(std::move(globals)), DeclList(std::move(decl)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
     std::string ret;
@@ -851,9 +852,14 @@ public:
       ret = ret + "├── "+"ExternFunctions:";
       for(unsigned i=0; i<ExtrnList.size(); i++) {
         ret = ret + ExtrnList.at(i)->to_string().c_str();
-
       }
       indentation.resize( indentation.size()-3 );
+    }
+    if (Globals.size()>0) {
+      ret = ret + "\n"+"├── "+"GlobalVarsDeclarations: ";
+      for(unsigned i=0; i<Globals.size(); i++) {
+        ret = ret + Globals.at(i)->to_string().c_str();
+      }
     }
     if (DeclList.size()>0){
       ret = ret + "\n"+"├── "+"FunctionDeclarations: ";
@@ -861,9 +867,11 @@ public:
       for(unsigned i=0; i<DeclList.size(); i++) {
         ret = ret+DeclList.at(i)->to_string().c_str();
       }
-      //indentation.resize( indentation.size()-3 );
     }
     return ret;
+  }
+  void add_global(std::unique_ptr<ParamASTnode> global) {
+    Globals.push_back(std::move(global));
   }
 };
 
@@ -909,6 +917,8 @@ static std::vector<std::unique_ptr<PrototypeAST>> ParseExternListPrime2();
 static std::unique_ptr<PrototypeAST> ParsePrototype();
 static std::unique_ptr<FunctionAST> ParseFunction();
 static std::vector<std::unique_ptr<FunctionAST>> ParseFunctionsList();
+static std::unique_ptr<ParamASTnode> ParseGlobal();
+static std::vector<std::unique_ptr<ParamASTnode>> ParseGlobals();
 
 /* Add function calls for each production */
 
@@ -921,8 +931,10 @@ static std::unique_ptr<ASTnode> parser() {
     if ((t != VOID_TOK) && (t != INT_TOK) && (t != FLOAT_TOK) && (t != BOOL_TOK)) {
       LogError("ERROR. Missing function type.");
     }
+    auto globals_list = ParseGlobals();
     auto funcs_list = ParseFunctionsList();
-    auto Result = std::make_unique<ProgramASTnode>(std::move(extern_list), std::move(funcs_list));
+
+    auto Result = std::make_unique<ProgramASTnode>(std::move(extern_list),std::move(globals_list), std::move(funcs_list));
     return std::move(Result);
 
   } else {
@@ -931,8 +943,10 @@ static std::unique_ptr<ASTnode> parser() {
       LogError("ERROR. Missing function type.");
     }
     std::vector<std::unique_ptr<PrototypeAST>> empty_list;
+    auto globals_list = ParseGlobals();
     auto funcs_list = ParseFunctionsList();
-    auto Result = std::make_unique<ProgramASTnode>(std::move(empty_list), std::move(funcs_list));
+
+    auto Result = std::make_unique<ProgramASTnode>(std::move(empty_list), std::move(globals_list), std::move(funcs_list));
     return std::move(Result);
   }
 
@@ -960,7 +974,6 @@ static std::vector<std::unique_ptr<FunctionAST>> ParseFunctionsListPrime() {
 
 }
 
-
 static std::vector<std::unique_ptr<FunctionAST>> ParseFunctionsList() {
   std::vector<std::unique_ptr<FunctionAST>> funcs_list;
 
@@ -975,6 +988,40 @@ static std::vector<std::unique_ptr<FunctionAST>> ParseFunctionsList() {
     }
   }
   return funcs_list;
+}
+
+static std::unique_ptr<ParamASTnode> ParseGlobal() {
+  TOKEN type = CurTok;
+  getNextToken();
+  if (CurTok.type == IDENT) {
+    TOKEN ident = CurTok;
+    getNextToken();
+    if (CurTok.type == SC) {
+      auto global_type = std::make_unique<VarTypeASTnode>(type);
+      auto global_id = std::make_unique<IdentASTnode>(ident);
+      auto global = std::make_unique<ParamASTnode>(std::move(global_type), std::move(global_id));
+      getNextToken();
+      return std::move(global);
+    }
+    putBackToken(CurTok);
+    putBackToken(ident);
+  }
+  putBackToken(type);
+  getNextToken();
+  return nullptr;
+}
+
+static std::vector<std::unique_ptr<ParamASTnode>> ParseGlobals() {
+  std::vector<std::unique_ptr<ParamASTnode>> globals;
+  std::unique_ptr<ParamASTnode> global;
+
+  do {
+    global = ParseGlobal();
+    globals.push_back(std::move(global));
+
+  } while (global);
+
+  return std::move(globals);
 }
 
 static std::unique_ptr<FunctionAST> ParseFunction() {
@@ -1799,12 +1846,18 @@ static LLVMContext TheContext;
 static IRBuilder<> Builder(TheContext);
 static std::unique_ptr<Module> TheModule;
 static std::map<std::string, Value*> NamedValues;
+// static std::map<std::string, AllocaInst*> NamedValues;
 // static std::map<std::string, Value*> GlobalNamedValues;
 
 Value *LogErrorV(const char *Str) {
   fprintf(stderr, "\nLogError: \n%s\n\n", Str);
   return nullptr;
 }
+
+// static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::string &VarName) {
+//   IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
+//   return TmpB.CreateAlloca(Type::)
+// }
 
 Value *IntASTnode::codegen() {
   return ConstantInt::get(TheContext, APInt(32, Val, false));
@@ -1929,6 +1982,10 @@ Function *FunctionAST::codegen() {
 
   NamedValues.clear();
   for(auto &Arg : TheFunction->args()) {
+    // AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, Arg.getName());
+    //
+    // Builder.CreateStore(&Arg, Alloca);
+
     NamedValues[Arg.getName()] = &Arg;
   }
 
