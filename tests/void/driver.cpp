@@ -27,5 +27,5 @@ int main() {
 
   Void();
   std::cout << "PASSED Result " << std::endl;
-    
+
 }

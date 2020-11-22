@@ -446,11 +446,12 @@ public:
 
 class BoolASTnode : public ASTnode {
   bool Val;
+  int IntVal;
   TOKEN Tok;
   std::string Name;
 
 public:
-  BoolASTnode(TOKEN tok, bool val) : Val(val), Tok(tok), Name(boolToString(val)) {}
+  BoolASTnode(TOKEN tok, bool val) : Val(val), IntVal(int(val)), Tok(tok), Name(boolToString(val)) {}
   virtual Value *codegen() override;
   virtual std::string to_string() const override {
     //return std::to_string(Val);
@@ -685,7 +686,7 @@ class WhileASTnode : public ASTnode {
   std::unique_ptr<ASTnode> Stmt;
 public:
   WhileASTnode(std::unique_ptr<ASTnode> expr, std::unique_ptr<ASTnode> stmt) : Expr(std::move(expr)), Stmt(std::move(stmt)) {}
-  virtual Value *codegen() override {}
+  virtual Value *codegen() override;
   virtual std::string to_string() const override {
 
     indentation = indentation + "   ";
@@ -791,6 +792,9 @@ public:
     return Type->get_var_type();
   }
   std::string get_name() const {
+    if (!Id) {
+      return "";
+    }
     return Id->get_id_name();
   }
 };
@@ -960,6 +964,7 @@ static std::vector<std::unique_ptr<FunctionAST>> ParseFunctionsListPrime() {
   while ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK) || (t==VOID_TOK)) {
     auto func = ParseFunction();
     if (func) {
+      auto *FuncIR = func->codegen();
       funcs_list_prime.push_back(std::move(func));
     }
     t = CurTok.type;
@@ -1869,7 +1874,7 @@ Value *FloatASTnode::codegen() {
 }
 
 Value *BoolASTnode::codegen() {
-  return ConstantInt::get(TheContext, APInt(1, Val, false));
+  return ConstantInt::get(TheContext, APInt(1, IntVal, false));
 }
 
 Value *IdentASTnode::codegen() {
@@ -1899,15 +1904,36 @@ Value *ExpressionASTnode::codegen() {
   }
 
   if (Op.compare("+")==0) {
-    return Builder.CreateBinOp(Instruction::FAdd, L, R);
-    // return Builder.CreateFAdd(L, R, "addtmp");
+    if (L->getType() == Type::getInt32Ty(TheContext)) {
+      return Builder.CreateAdd(L, R, "addtmp");
+    } else if (L->getType() == Type::getFloatTy(TheContext)) {
+      return Builder.CreateFAdd(L, R, "addtmp");
+    }
   } else if (Op.compare("*")==0) {
-    return Builder.CreateFMul(L, R, "addtmp");
+    if (L->getType() == Type::getInt32Ty(TheContext)) {
+      return Builder.CreateMul(L, R, "addtmp");
+    } else if (L->getType() == Type::getFloatTy(TheContext)) {
+      return Builder.CreateFMul(L, R, "addtmp");
+    }
   } else if (Op.compare("-")==0) {
-    return Builder.CreateFSub(L, R, "subtmp");
+    if (L->getType() == Type::getInt32Ty(TheContext)) {
+      return Builder.CreateSub(L, R, "subtmp");
+    } else if (L->getType() == Type::getFloatTy(TheContext)) {
+      return Builder.CreateFSub(L, R, "subtmp");
+    }
   } else if (Op.compare("/")==0) {
-    return Builder.CreateFDiv(L, R, "divtmp");
+    if (L->getType() == Type::getInt32Ty(TheContext)) {
+      return Builder.CreateSDiv(L, R, "divtmp");
+    } else if(L->getType() == Type::getFloatTy(TheContext)) {
+      fprintf(stderr, "NU YRA DIVISION FLOATS\n");
+      return Builder.CreateFDiv(L, R, "divtmp");
+    }
   } else if (Op.compare("%")==0) {
+    if (L->getType() == Type::getInt32Ty(TheContext)) {
+      return Builder.CreateSRem(L, R, "remtmp");
+    } else if(L->getType() == Type::getFloatTy(TheContext)) {
+      return Builder.CreateFRem(L, R, "remtmp");
+    }
     return Builder.CreateFRem(L, R, "remtmp");
   } else if (Op.compare("<")==0) {
     if (L->getType() == Type::getInt32Ty(TheContext)) {
@@ -1995,7 +2021,7 @@ Function *PrototypeAST::codegen() {
 
     } else if (std::string(Params.at(i)->get_type()).compare("void")==0) {
       param_type = Type::getVoidTy(TheContext);
-
+      // break;
     }
     Parameters.push_back(param_type);
   }
@@ -2012,11 +2038,14 @@ Function *PrototypeAST::codegen() {
     FT = FunctionType::get(Type::getInt1Ty(TheContext), Parameters, false);
 
   } else if (get_type().compare("void")==0) {
+    fprintf(stderr, "CIA SEDIIIIII\n");
     FT = FunctionType::get(Type::getVoidTy(TheContext), Parameters, false);
   }
 
   std::string Name = get_name();
+  fprintf(stderr, "%s\n", Name.c_str());
   Function *F = Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
+
 
   unsigned Idx = 0;
   for (auto &Arg : F->args()) {
@@ -2074,6 +2103,7 @@ Function *FunctionAST::codegen() {
     i++;
   }
 
+
   if (Value *RetVal = Body->codegen()) {
 
     if (TheFunction->getReturnType() != RetVal->getType()) {
@@ -2123,9 +2153,17 @@ Value *AssignASTnode::codegen() {
     return nullptr;
   }
   Value *Variable = NamedValues[Id->get_id_name()];
+
+  if (Id->get_id_name().compare("alt") == 0) {
+    fprintf(stderr, "ALT HERE\n");
+    if (Val->getType() == Type::getFloatTy(TheContext)) {
+      fprintf(stderr, "FLOAT NIG\n");
+    }
+  }
   if (!Variable) {
     return LogErrorV("Unknown variable name");
   }
+
   Builder.CreateStore(Val, Variable);
   return Val;
 }
@@ -2168,6 +2206,11 @@ Value *ParamASTnode::codegen() {
 }
 
 Value *ReturnASTnode::codegen() {
+  if (!Expr) {
+    // return Constant::getNullValue(Type::getVoidTy(TheContext));
+    // return UndefValue::get(Type::getVoidTy(TheContext));
+    return nullptr;
+  }
   return Expr->codegen();
 }
 
@@ -2202,8 +2245,14 @@ Value *IfASTnode::codegen() {
   if (!CondV) {
     return nullptr;
   }
-
-  CondV = Builder.CreateFCmpONE(CondV, ConstantFP::get(TheContext, APFloat(0.0)), "ifcond");
+  if (CondV->getType() == Type::getInt1Ty(TheContext)) {
+    // CondV = Builder.CreateSIToFP(CondV, Type::getFloatTy(TheContext));
+    CondV = Builder.CreateICmpNE(CondV, ConstantInt::get(TheContext, APInt(1, 0, false)), "ifcond");
+    fprintf(stderr, "CIA NJK\n");
+  } else {
+    CondV = Builder.CreateFCmpONE(CondV, ConstantFP::get(TheContext, APFloat(0.0)), "ifcond");
+  }
+  fprintf(stderr, "CIA NJK\n");
   // CondV = Builder.CreateFCmpONE(CondV, ConstantFP::get(TheContext, APFloat(0.0)), "ifcond");
 
   Function *TheFunction = Builder.GetInsertBlock()->getParent();
@@ -2259,6 +2308,39 @@ Value *IfASTnode::codegen() {
 Value *ElseASTnode::codegen() {
   fprintf(stderr, "Else Codegen\n");
   return Block->codegen();
+}
+
+Value *WhileASTnode::codegen() {
+  Value *Cond = Expr->codegen();
+  Cond = Builder.CreateFCmpONE(Cond, ConstantFP::get(TheContext, APFloat(0.0)), "isloopcond");
+
+  Function *TheFunction = Builder.GetInsertBlock()->getParent();
+  BasicBlock *PreheaderBB = Builder.GetInsertBlock();
+  BasicBlock *LoopBB = BasicBlock::Create(TheContext, "loop", TheFunction);
+  BasicBlock *AfterBB = BasicBlock::Create(TheContext, "afterloop", TheFunction);
+
+  // Builder.CreateBr(LoopBB);
+  Builder.CreateCondBr(Cond, LoopBB, AfterBB);
+  Builder.SetInsertPoint(LoopBB);
+
+  if (!Stmt->codegen()) {
+    return nullptr;
+  }
+
+  Value *EndCond = Expr->codegen();
+  if (!EndCond) {
+    return nullptr;
+  }
+
+  EndCond = Builder.CreateFCmpONE(EndCond, ConstantFP::get(TheContext, APFloat(0.0)), "loopcond");
+
+  BasicBlock *LoopEndBB = Builder.GetInsertBlock();
+  // BasicBlock *AfterBB = BasicBlock::Create(TheContext, "afterloop", TheFunction);
+
+  Builder.CreateCondBr(EndCond, LoopBB, AfterBB);
+  Builder.SetInsertPoint(AfterBB);
+
+  return Constant::getNullValue(Type::getFloatTy(TheContext));
 }
 
 //===----------------------------------------------------------------------===//
@@ -2340,7 +2422,7 @@ int main(int argc, char **argv) {
   fprintf(stderr, "Parsing Finished\n");
 
 
-  // llvm::outs() << *ASTree << "\n\n";
+  llvm::outs() << *ASTree << "\n\n";
 
 
 

@@ -1,16 +1,11 @@
 extern int print_int(int X);
 
-int addition(int n, int m){
-	int result;
-	bool b;
-	b = 1;
-	b = !b;
-	result = -1;
-	if (1.0<2.0) {
-		result = m;
-	}
-	result = m+n;
+float addition(int n, int m){
+	float a;
+	a = -1;
+
+	a = -a;
 
 
-  return result;
+  return a;
 }

@@ -8,7 +8,7 @@ export PATH=$LLVM_INSTALL_PATH/bin:$PATH
 export LD_LIBRARY_PATH=$LLVM_INSTALL_PATH/lib:$LD_LIBRARY_PATH
 CLANG=$LLVM_INSTALL_PATH/bin/clang++
 
-module load gcc9
+#module load gcc9
 
 DIR="$(pwd)"
 
