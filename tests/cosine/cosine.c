@@ -19,29 +19,13 @@ float cosine (float x) {
   term = 1.0;
   alt = -1.0;
 
-  // term = term * x * x / n / (n+1);
-  term = x / n / (n+1);
-  cos = cos + alt * term;
-  // alt = -alt;
-  // n = n + 2;
-  print_float(term);
-  // print_float(cos);
-  // print_float(alt);
-  // print_float(n);
 
-  // while (term > eps) {
-  //   term = term * x * x / n / (n+1);
-  //   cos = cos + alt * term;
-  //   alt = -alt;
-  //   n = n + 2;
-  //   if (i<5) {
-  //     print_float(term);
-  //     print_float(cos);
-  //     print_float(alt);
-  //     print_float(n);
-  //   }
-  //   i = i+1;
-  // }
+  while (term > eps) {
+    term = term * x * x / n / (n+1);
+    cos = cos + alt * term;
+    alt = -alt;
+    n = n + 2;
+  }
 
   print_float(term);
   return alt;

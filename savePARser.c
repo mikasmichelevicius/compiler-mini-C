@@ -38,7 +38,6 @@ using namespace llvm;
 using namespace llvm::sys;
 
 FILE *pFile;
-extern std::string indentation = "";
 
 //===----------------------------------------------------------------------===//
 // Lexer
@@ -123,6 +122,7 @@ static float FloatVal;            // Filled in if FLOAT_LIT
 static std::string StringVal;     // Filled in if String Literal
 static int lineNo, columnNo;
 
+extern std::string indentation = "";
 
 static TOKEN returnTok(std::string lexVal, int tok_type) {
   TOKEN return_tok;
@@ -423,6 +423,7 @@ public:
     std::string ret = "\n"+indentation+"├── "+"IntegerLiteral 'int', value: "+std::to_string(Val);
     indentation.resize(indentation.size()-3);
     return ret;
+    // return std::to_string(Val);
   }
 };
 
@@ -439,6 +440,7 @@ public:
     std::string ret = "\n"+indentation+"├── "+"FloatLiteral 'float', value: "+std::to_string(Val);
     indentation.resize(indentation.size()-3);
     return ret;
+    // return std::to_string(Val);
   }
 };
 
@@ -452,10 +454,13 @@ public:
   BoolASTnode(TOKEN tok, bool val) : Val(val), IntVal(int(val)), Tok(tok), Name(boolToString(val)) {}
   virtual Value *codegen() override;
   virtual std::string to_string() const override {
+    //return std::to_string(Val);
     indentation = indentation + "   ";
     std::string ret = "\n"+indentation+"├── "+"BooleanLiteral 'bool', value: "+Name;
     indentation.resize(indentation.size()-3);
     return ret;
+
+    // return Name;
   }
 };
 
@@ -467,6 +472,7 @@ public:
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
     return "";
+    // return Semicol+"\n";
   }
 };
 
@@ -481,6 +487,7 @@ public:
     std::string ret = "\n"+indentation+"├── "+"FuncOrVarIdentity 'ident', value: '"+Name+"'";
     indentation.resize(indentation.size()-3);
     return ret;
+    // return Name;
   }
 
   std::string get_id_name() const {
@@ -503,6 +510,7 @@ public:
     std::string ret = "\n"+indentation+"├── "+"NegOfExpression, prefix: '" + std::string(1, Op) +"'"+Expr->to_string().c_str()+std::string(1,')');
     indentation.resize(indentation.size()-3);
     return ret;
+    // return std::string(1,'(')+std::string(1, Op)+Expr->to_string().c_str()+std::string(1,')');
   }
 };
 
@@ -522,6 +530,8 @@ public:
     ret = ret + "\n"+indentation+"├── "+"LeftHandSide of expression: "+LHS->to_string()+"\n"+indentation+"├── "+"RightHandSide of expression: "+RHS->to_string().c_str();
     indentation.resize(indentation.size()-6);
     return ret;
+    // return LHS->to_string().c_str()+Op+RHS->to_string().c_str();
+
   }
 };
 
@@ -536,6 +546,19 @@ public:
     std::string ret = "\n"+indentation+"├── "+"Expression in parantheses: " + Expr->to_string();
     indentation.resize(indentation.size()-3);
     return ret;
+    // return std::string(1,'(')+Expr->to_string().c_str()+std::string(1,')');
+  }
+};
+
+class ExprSemicolASTnode : public ASTnode {
+  std::unique_ptr<ASTnode> Expr;
+  std::unique_ptr<ASTnode> Semicol;
+public:
+  ExprSemicolASTnode(std::unique_ptr<ASTnode> expr, std::unique_ptr<ASTnode> semicol) : Expr(std::move(expr)), Semicol(std::move(semicol)) {}
+  virtual Value *codegen() override {}
+  virtual std::string to_string() const override {
+    return Expr->to_string().c_str();
+    // return Expr->to_string().c_str()+std::string(Semicol->to_string().c_str());
   }
 };
 
@@ -553,6 +576,7 @@ public:
     ret = ret + "\n"+indentation+"├── "+"IdentityOfAssignment: " + Id->to_string().c_str() + "\n"+indentation+"├── "+"Assignment expression:" + Assignment->to_string().c_str();
     indentation.resize(indentation.size()-6);
     return ret;
+    // return Id+std::string(1,'=')+Assignment->to_string().c_str();
   }
 };
 
@@ -590,9 +614,40 @@ public:
     std::string ret = "\n"+indentation+"├── "+"VarOrFuncType, value: '" + Type + "'";
     indentation.resize(indentation.size()-3);
     return ret;
+    // return Type+" ";
   }
   std::string get_var_type() const {
     return Type;
+  }
+};
+
+class VoidASTnode : public ASTnode {
+  std::string Type;
+public:
+  VoidASTnode(TOKEN tok) : Type(tok.lexeme.c_str()) {}
+  virtual Value *codegen() override {}
+  virtual std::string to_string() const override {
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"VoidFuncType, value: '" + Type + "'";
+    indentation.resize(indentation.size()-3);
+    return ret;
+    // return Type;
+  }
+};
+
+class LocalDeclASTnode : public ASTnode {
+  std::unique_ptr<ASTnode> Type;
+  std::unique_ptr<ASTnode> Id;
+  std::unique_ptr<ASTnode> Semicol;
+public:
+  LocalDeclASTnode(std::unique_ptr<ASTnode> type, std::unique_ptr<ASTnode> ident_node, std::unique_ptr<ASTnode> semicol) : Type(std::move(type)), Id(std::move(ident_node)), Semicol(std::move(semicol)) {}
+  virtual Value *codegen() override {}
+  virtual std::string to_string() const override {
+    indentation = indentation + "   ";
+    std::string ret = "\n"+indentation+"├── "+"LocalDeclOfVar:"+Type->to_string()+Id->to_string();
+    indentation.resize(indentation.size()-3);
+    return ret;
+    // return Type->to_string().c_str()+Id+std::string(Semicol->to_string().c_str());
   }
 };
 
@@ -603,6 +658,7 @@ public:
   BlockASTnode(std::vector<std::unique_ptr<ASTnode>> decls, std::vector<std::unique_ptr<ASTnode>> stmts) : Decls(std::move(decls)), Stmts(std::move(stmts)) {}
   virtual Value *codegen() override;
   virtual std::string to_string() const override {
+    // indentation = indentation + "   ";
     std::string ret = "\n"+indentation+"├── "+"BlockExpression: ";
     if (Decls.size()>0) {
       indentation = indentation + "   ";
@@ -620,6 +676,7 @@ public:
       }
       indentation.resize(indentation.size()-3);
     }
+    // indentation.resize(indentation.size()-3);
     return ret;
   }
 };
@@ -640,6 +697,9 @@ public:
     ret = ret + "\n"+indentation+"├── "+"StatementsExpr in the While block:";
     ret = ret + Stmt->to_string().c_str();
     indentation.resize(indentation.size()-6);
+    // std::string ret = "while (";
+    // ret = ret + std::string(Expr->to_string().c_str()) + ")";
+    // ret = ret + std::string(Stmt->to_string().c_str());
     return ret;
   }
 };
@@ -661,6 +721,12 @@ public:
       ret = ret + "\n"+indentation+"├── "+"Else block of If Statement: " + Else->to_string().c_str();
     }
     indentation.resize(indentation.size()-6);
+    // std::string ret = "if (";
+    // ret = ret + std::string(Expr->to_string().c_str()) + ")";
+    // ret = ret + std::string(Block->to_string().c_str());
+    // if (Else) {
+    //   ret = ret + std::string(Else->to_string().c_str());
+    // }
     return ret;
   }
 };
@@ -684,7 +750,7 @@ class ReturnASTnode : public ASTnode {
   std::unique_ptr<ASTnode> Expr;
   std::unique_ptr<ASTnode> Semicol;
 public:
-  ReturnASTnode(std::unique_ptr<ASTnode> expr) : Expr(std::move(expr)) {}
+  ReturnASTnode(std::unique_ptr<ASTnode> expr, std::unique_ptr<ASTnode> semicol) : Expr(std::move(expr)), Semicol(std::move(semicol)) {}
   virtual Value *codegen() override;
   virtual std::string to_string() const override {
     indentation = indentation + "   ";
@@ -695,6 +761,11 @@ public:
       indentation.resize(indentation.size()-3);
     }
     indentation.resize(indentation.size()-3);
+    // std::string ret = "return ";
+    // if (Expr) {
+    //   ret = ret + std::string(Expr->to_string().c_str());
+    // }
+    // ret = ret + std::string(Semicol->to_string().c_str());
     return ret;
   }
 };
@@ -708,35 +779,6 @@ public:
   virtual std::string to_string() const override {
     indentation = indentation + "   ";
     std::string ret = "\n" +indentation +"├── "+"Parameter of Function: ";
-    if (Type->get_var_type().compare("void")==0) {
-      ret = ret + Type->to_string();
-    } else {
-      ret = ret + Type->to_string() + Id->to_string().c_str();
-    }
-
-    indentation.resize(indentation.size()-3);
-    return ret;
-  }
-  std::string get_type() const {
-    return Type->get_var_type();
-  }
-  std::string get_name() const {
-    if (!Id) {
-      return "";
-    }
-    return Id->get_id_name();
-  }
-};
-
-class GlobalASTnode : public ASTnode {
-  std::unique_ptr<VarTypeASTnode> Type;
-  std::unique_ptr<IdentASTnode> Id;
-public:
-  GlobalASTnode(std::unique_ptr<VarTypeASTnode> type, std::unique_ptr<IdentASTnode> ident_node) : Type(std::move(type)), Id(std::move(ident_node)) {}
-  virtual Value *codegen() override;
-  virtual std::string to_string() const override {
-    indentation = indentation + "   ";
-    std::string ret = "\n" +indentation +"├── "+"Global Parameters: ";
     if (Type->get_var_type().compare("void")==0) {
       ret = ret + Type->to_string();
     } else {
@@ -802,10 +844,10 @@ public:
 
 class ProgramASTnode : public ASTnode {
   std::vector<std::unique_ptr<PrototypeAST>> ExtrnList;
-  std::vector<std::unique_ptr<GlobalASTnode>> Globals;
+  std::vector<std::unique_ptr<ParamASTnode>> Globals;
   std::vector<std::unique_ptr<FunctionAST>> DeclList;
 public:
-  ProgramASTnode(std::vector<std::unique_ptr<PrototypeAST>> extrn, std::vector<std::unique_ptr<GlobalASTnode>> globals, std::vector<std::unique_ptr<FunctionAST>> decl) : ExtrnList(std::move(extrn)), Globals(std::move(globals)), DeclList(std::move(decl)) {}
+  ProgramASTnode(std::vector<std::unique_ptr<PrototypeAST>> extrn, std::vector<std::unique_ptr<ParamASTnode>> globals, std::vector<std::unique_ptr<FunctionAST>> decl) : ExtrnList(std::move(extrn)), Globals(std::move(globals)), DeclList(std::move(decl)) {}
   virtual Value *codegen() override {}
   virtual std::string to_string() const override {
     std::string ret;
@@ -817,7 +859,8 @@ public:
       }
       indentation.resize( indentation.size()-3 );
     }
-    if (Globals.size()>0) {
+    if (Globals.at(0)) {
+      fprintf(stderr, "CIA SEDI\n");
       ret = ret + "\n"+"├── "+"GlobalVarsDeclarations: ";
       for(unsigned i=0; i<Globals.size(); i++) {
         ret = ret + Globals.at(i)->to_string().c_str();
@@ -832,7 +875,7 @@ public:
     }
     return ret;
   }
-  void add_global(std::unique_ptr<GlobalASTnode> global) {
+  void add_global(std::unique_ptr<ParamASTnode> global) {
     Globals.push_back(std::move(global));
   }
 };
@@ -870,6 +913,7 @@ static std::vector<std::unique_ptr<ParamASTnode>> ParseParams();
 static std::unique_ptr<ASTnode> ParseFuncDecl();
 static std::vector<std::unique_ptr<ASTnode>> ParseDeclList();
 static std::unique_ptr<ASTnode> ParseDecl();
+static std::unique_ptr<ASTnode> ParseExtern();
 static std::vector<std::unique_ptr<ASTnode>> ParseExternList();
 static std::unique_ptr<ASTnode> LogError(const char *Str);
 static std::unique_ptr<PrototypeAST> ParseExtern2();
@@ -878,8 +922,8 @@ static std::vector<std::unique_ptr<PrototypeAST>> ParseExternListPrime2();
 static std::unique_ptr<PrototypeAST> ParsePrototype();
 static std::unique_ptr<FunctionAST> ParseFunction();
 static std::vector<std::unique_ptr<FunctionAST>> ParseFunctionsList();
-static std::unique_ptr<GlobalASTnode> ParseGlobal();
-static std::vector<std::unique_ptr<GlobalASTnode>> ParseGlobals();
+static std::unique_ptr<ParamASTnode> ParseGlobal();
+static std::vector<std::unique_ptr<ParamASTnode>> ParseGlobals();
 
 /* Add function calls for each production */
 
@@ -941,6 +985,7 @@ static std::vector<std::unique_ptr<FunctionAST>> ParseFunctionsList() {
 
   auto func = ParseFunction();
   if (func) {
+    // func->codegen() etc
     auto *FuncIR = func->codegen();
     funcs_list.push_back(std::move(func));
     auto funcs_list_prime = ParseFunctionsListPrime();
@@ -951,7 +996,7 @@ static std::vector<std::unique_ptr<FunctionAST>> ParseFunctionsList() {
   return funcs_list;
 }
 
-static std::unique_ptr<GlobalASTnode> ParseGlobal() {
+static std::unique_ptr<ParamASTnode> ParseGlobal() {
   TOKEN type = CurTok;
   getNextToken();
   if (CurTok.type == IDENT) {
@@ -960,7 +1005,7 @@ static std::unique_ptr<GlobalASTnode> ParseGlobal() {
     if (CurTok.type == SC) {
       auto global_type = std::make_unique<VarTypeASTnode>(type);
       auto global_id = std::make_unique<IdentASTnode>(ident);
-      auto global = std::make_unique<GlobalASTnode>(std::move(global_type), std::move(global_id));
+      auto global = std::make_unique<ParamASTnode>(std::move(global_type), std::move(global_id));
       getNextToken();
       return std::move(global);
     }
@@ -972,20 +1017,15 @@ static std::unique_ptr<GlobalASTnode> ParseGlobal() {
   return nullptr;
 }
 
-static std::vector<std::unique_ptr<GlobalASTnode>> ParseGlobals() {
-  std::vector<std::unique_ptr<GlobalASTnode>> globals;
-  std::unique_ptr<GlobalASTnode> global;
-  bool isGlobal = true;
-  do {
-    isGlobal = false;
-    global = ParseGlobal();
-    if (global) {
-      Value *GlobIR = global->codegen();
-      isGlobal = true;
-      globals.push_back(std::move(global));
-    }
+static std::vector<std::unique_ptr<ParamASTnode>> ParseGlobals() {
+  std::vector<std::unique_ptr<ParamASTnode>> globals;
+  std::unique_ptr<ParamASTnode> global;
 
-  } while (isGlobal);
+  do {
+    global = ParseGlobal();
+    globals.push_back(std::move(global));
+
+  } while (global);
 
   return std::move(globals);
 }
@@ -994,6 +1034,10 @@ static std::unique_ptr<FunctionAST> ParseFunction() {
   auto Proto = ParsePrototype();
   auto block = ParseBlock();
   auto Result = std::make_unique<FunctionAST>(std::move(Proto), std::move(block));
+
+  if (Result) {
+    //Result->codegen() etc;
+  }
   return std::move(Result);
 
 }
@@ -1001,6 +1045,7 @@ static std::unique_ptr<FunctionAST> ParseFunction() {
 static std::unique_ptr<ASTnode> LogError(const char *Str) {
   fprintf(stderr, "\nLogError: Line number: %d, Column number: %d,\n%s\n\n",lineNo, CurTok.columnNo, Str);
   exit(0);
+  // return nullptr;
 }
 
 static std::vector<std::unique_ptr<PrototypeAST>> ParseExternListPrime2() {
@@ -1010,6 +1055,7 @@ static std::vector<std::unique_ptr<PrototypeAST>> ParseExternListPrime2() {
   while (t == EXTERN) {
     auto ext = ParseExtern2();
     if (ext) {
+      // ext->codegen() etc
       auto *ExternIR = ext->codegen();
       extern_list_prime.push_back(std::move(ext));
     }
@@ -1024,6 +1070,7 @@ static std::vector<std::unique_ptr<PrototypeAST>> ParseExternList2() {
 
   auto ext = ParseExtern2();
   if (ext) {
+    // ext->codegen() etc
     auto *ExternIR = ext->codegen();
     extern_list.push_back(std::move(ext));
     auto extern_list_prime = ParseExternListPrime2();
@@ -1172,14 +1219,14 @@ static std::unique_ptr<ASTnode> ParseReturnStmt() {
   int t = CurTok.type;
   if (t == SC) {
     auto semicol = std::make_unique<SemicolASTnode>(CurTok);
-    auto Result = std::make_unique<ReturnASTnode>(nullptr);
+    auto Result = std::make_unique<ReturnASTnode>(nullptr, std::move(semicol));
     getNextToken();
     return std::move(Result);
   } else if ((t==INT_LIT) || (t==FLOAT_LIT) || (t==BOOL_LIT) || (t==MINUS) || (t==NOT) || (t==IDENT) || (t==LPAR)) {
     auto expr = ParseExpr();
     if (CurTok.type==SC) {
       auto semicol = std::make_unique<SemicolASTnode>(CurTok);
-      auto Result = std::make_unique<ReturnASTnode>(std::move(expr));
+      auto Result = std::make_unique<ReturnASTnode>(std::move(expr), std::move(semicol));
       getNextToken();
       return std::move(Result);
     } else {
@@ -1342,6 +1389,7 @@ static std::unique_ptr<ASTnode> ParseLocalDecl() {
   if ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK)) {
 
     auto var_type = ParseVarType();
+    //t = CurTok.type;
     if (CurTok.type == IDENT) {
 
       TOKEN ident = CurTok;
@@ -1349,7 +1397,9 @@ static std::unique_ptr<ASTnode> ParseLocalDecl() {
 
       if (CurTok.type == SC) {
         auto ident_node = std::make_unique<IdentASTnode>(ident);
+        auto semicol = std::make_unique<SemicolASTnode>(CurTok);
 
+        // auto Result = std::make_unique<LocalDeclASTnode>(std::move(var_type),std::move(ident_node),std::move(semicol));
         auto Result = std::make_unique<ParamASTnode>(std::move(var_type), std::move(ident_node));
         getNextToken();
         return std::move(Result);
@@ -1429,7 +1479,7 @@ static std::unique_ptr<ASTnode> ParseNegativeExpr() {
 static std::unique_ptr<ASTnode> ParseStmt() {
   int t = CurTok.type;
 
-  if (t==LBRA) {
+  if (t==LBRA) { // BLOCK ------------------------------------------------------
     auto block = ParseBlock();
     if (block) {return std::move(block);}
   }
@@ -1449,6 +1499,7 @@ static std::unique_ptr<ASTnode> ParseStmt() {
   else if ((t==INT_LIT) || (t==FLOAT_LIT) || (t==BOOL_LIT) || (t==MINUS) || (t==NOT) || (t==IDENT) || (t==LPAR) || (t==SC)) {
     auto expr_stmt = ParseExprStmt();
     if (expr_stmt) {
+      //getNextToken();
       return std::move(expr_stmt);
     }
   } else {
@@ -1466,6 +1517,7 @@ static std::unique_ptr<ASTnode> ParseExprStmt() {
 
     t = CurTok.type;
     if (t==SC) {
+      auto semicol = std::make_unique<SemicolASTnode>(CurTok);
       if (Expr_parsed) {
         getNextToken();
         return std::move(Expr_parsed);
@@ -1473,6 +1525,14 @@ static std::unique_ptr<ASTnode> ParseExprStmt() {
     } else {
       LogError("ERROR. Semicolon is expected after expression.");
     }
+  }
+  else if (t==SC) {
+    auto semicol = std::make_unique<SemicolASTnode>(CurTok);
+    getNextToken();
+    return std::move(semicol);
+
+  } else {
+    LogError("ERROR. Expression or semicolon is expected.");
   }
   return nullptr;
 
@@ -1524,9 +1584,11 @@ static std::unique_ptr<ASTnode> Rval1Expr() {
       auto Rval1 = Rval1Expr();
       if (Rval1 && Rval2) {
         auto Result = std::make_unique<ExpressionASTnode>(op, std::move(Rval2), std::move(Rval1));
+        //getNextToken();
         return std::move(Result);
       }
     } else {
+      // FIRST(rval1) = eps
       if (Rval2) {return Rval2;}
     }
 
@@ -1551,6 +1613,7 @@ static std::unique_ptr<ASTnode> Rval2Expr() {
         return std::move(Result);
       }
     } else {
+      // FIRST(rval2) = eps
       if (Rval3) {return Rval3;}
     }
 
@@ -1575,6 +1638,7 @@ static std::unique_ptr<ASTnode> Rval3Expr() {
         return std::move(Result);
       }
     } else {
+      // FIRST(rval3) = eps
       if (Rval4) {return Rval4;}
     }
 
@@ -1600,6 +1664,7 @@ static std::unique_ptr<ASTnode> Rval4Expr() {
           return std::move(Result);
         }
     } else {
+      // FIRST(rval4) = eps
       if (Rval5) {return Rval5;}
     }
 
@@ -1618,6 +1683,7 @@ static std::unique_ptr<ASTnode> Rval5Expr() {
     t = CurTok.type;
     TOKEN op = CurTok;
     if ((t==PLUS) || (t==MINUS)) {
+      //expand by rval5 ::= rval6 rval5'
       getNextToken();
       auto Rval5 = Rval5Expr();
       if (Rval5 && Rval6) {
@@ -1626,6 +1692,7 @@ static std::unique_ptr<ASTnode> Rval5Expr() {
       }
 
     } else {
+      // FIRST(rval5) = eps
       if (Rval6) {return Rval6;}
     }
 
@@ -1644,6 +1711,7 @@ static std::unique_ptr<ASTnode> Rval6Expr() {
     t = CurTok.type;
     TOKEN op = CurTok;
     if((t==ASTERIX) || (t==DIV) || (t==MOD)) {
+      //expand by rval6 ::= rval7 rval6'
       getNextToken();
       auto Rval6 = Rval6Expr();
       if (Rval6 && Rval7) {
@@ -1652,6 +1720,7 @@ static std::unique_ptr<ASTnode> Rval6Expr() {
       }
 
     } else {
+      // FIRST(rval6') = eps
       if (Rval7) {return Rval7;}
     }
 
@@ -1782,12 +1851,12 @@ static std::unique_ptr<ASTnode> ParseArg() {
 static LLVMContext TheContext;
 static IRBuilder<> Builder(TheContext);
 static std::unique_ptr<Module> TheModule;
+// static std::map<std::string, Value*> NamedValues;
 static std::map<std::string, AllocaInst*> NamedValues;
-static std::map<std::string, Value*> GlobalNamedValues;
+// static std::map<std::string, Value*> GlobalNamedValues;
 
 Value *LogErrorV(const char *Str) {
   fprintf(stderr, "\nLogError: \n%s\n\n", Str);
-  exit(0);
   return nullptr;
 }
 
@@ -1811,11 +1880,7 @@ Value *BoolASTnode::codegen() {
 Value *IdentASTnode::codegen() {
   Value *V = NamedValues[Name];
   if (!V) {
-    V = GlobalNamedValues[Name];
-    if (!V) {
-      return LogErrorV("Unknown variable name");
-    }
-    return V;
+    LogErrorV("Unknown variable name");
   }
 
   return Builder.CreateLoad(V, Name.c_str());
@@ -1827,6 +1892,10 @@ Value *ExpressionASTnode::codegen() {
   if (!L || !R) {
     return nullptr;
   }
+
+  // if (L->getType() != R->getType()) {
+  //   return LogErrorV("Types of operands does not match.");
+  // }
 
   if ((L->getType() == Type::Type::getInt32Ty(TheContext)) && (R->getType() == Type::Type::getFloatTy(TheContext))) {
     L = Builder.CreateSIToFP(L, Type::getFloatTy(TheContext));
@@ -1856,6 +1925,7 @@ Value *ExpressionASTnode::codegen() {
     if (L->getType() == Type::getInt32Ty(TheContext)) {
       return Builder.CreateSDiv(L, R, "divtmp");
     } else if(L->getType() == Type::getFloatTy(TheContext)) {
+      fprintf(stderr, "NU YRA DIVISION FLOATS\n");
       return Builder.CreateFDiv(L, R, "divtmp");
     }
   } else if (Op.compare("%")==0) {
@@ -1911,10 +1981,6 @@ Value *ExpressionASTnode::codegen() {
       L = Builder.CreateFCmpUNE(L, R, "cmptmp");
     }
     return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),"booltmp");
-  } else if (Op.compare("||")==0) {
-    return Builder.CreateOr(L, R);
-  } else if (Op.compare("&&")==0) {
-    return Builder.CreateAnd(L,R);
   }
 
   return LogErrorV("invalid binary operator");
@@ -1955,6 +2021,7 @@ Function *PrototypeAST::codegen() {
 
     } else if (std::string(Params.at(i)->get_type()).compare("void")==0) {
       param_type = Type::getVoidTy(TheContext);
+      // break;
     }
     Parameters.push_back(param_type);
   }
@@ -1971,10 +2038,12 @@ Function *PrototypeAST::codegen() {
     FT = FunctionType::get(Type::getInt1Ty(TheContext), Parameters, false);
 
   } else if (get_type().compare("void")==0) {
+    fprintf(stderr, "CIA SEDIIIIII\n");
     FT = FunctionType::get(Type::getVoidTy(TheContext), Parameters, false);
   }
 
   std::string Name = get_name();
+  fprintf(stderr, "%s\n", Name.c_str());
   Function *F = Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
 
 
@@ -2034,6 +2103,7 @@ Function *FunctionAST::codegen() {
     i++;
   }
 
+
   if (Value *RetVal = Body->codegen()) {
 
     if (TheFunction->getReturnType() != RetVal->getType()) {
@@ -2064,6 +2134,7 @@ Value *BlockASTnode::codegen() {
     if (!V) {
       return nullptr;
     }
+    // Builder.CreateRet(V);
   }
   V = Stmts.at(Stmts.size()-1)->codegen();
   if (!V) {
@@ -2083,13 +2154,14 @@ Value *AssignASTnode::codegen() {
   }
   Value *Variable = NamedValues[Id->get_id_name()];
 
-  if (!Variable) {
-    Variable = GlobalNamedValues[Id->get_id_name()];
-    if (!Variable) {
-      return LogErrorV("Unknown variable name");
+  if (Id->get_id_name().compare("alt") == 0) {
+    fprintf(stderr, "ALT HERE\n");
+    if (Val->getType() == Type::getFloatTy(TheContext)) {
+      fprintf(stderr, "FLOAT NIG\n");
     }
-    StoreInst *strTwo = new StoreInst(Val, Variable);
-    return strTwo;
+  }
+  if (!Variable) {
+    return LogErrorV("Unknown variable name");
   }
 
   Builder.CreateStore(Val, Variable);
@@ -2117,6 +2189,7 @@ Value *ParamASTnode::codegen() {
     InitVal = ConstantInt::get(TheContext, APInt(32, 0, false));
   } else if (var_type.compare("float")==0) {
     alloca_type = Type::getFloatTy(TheContext);
+    fprintf(stderr, "FLOAT INIT VAL\n");
     float val = 0;
     InitVal = ConstantFP::get(TheContext, APFloat(val));
   } else if (var_type.compare("bool")==0) {
@@ -2134,6 +2207,8 @@ Value *ParamASTnode::codegen() {
 
 Value *ReturnASTnode::codegen() {
   if (!Expr) {
+    // return Constant::getNullValue(Type::getVoidTy(TheContext));
+    // return UndefValue::get(Type::getVoidTy(TheContext));
     return nullptr;
   }
   return Expr->codegen();
@@ -2171,10 +2246,14 @@ Value *IfASTnode::codegen() {
     return nullptr;
   }
   if (CondV->getType() == Type::getInt1Ty(TheContext)) {
+    // CondV = Builder.CreateSIToFP(CondV, Type::getFloatTy(TheContext));
     CondV = Builder.CreateICmpNE(CondV, ConstantInt::get(TheContext, APInt(1, 0, false)), "ifcond");
+    fprintf(stderr, "CIA NJK\n");
   } else {
     CondV = Builder.CreateFCmpONE(CondV, ConstantFP::get(TheContext, APFloat(0.0)), "ifcond");
   }
+  fprintf(stderr, "CIA NJK\n");
+  // CondV = Builder.CreateFCmpONE(CondV, ConstantFP::get(TheContext, APFloat(0.0)), "ifcond");
 
   Function *TheFunction = Builder.GetInsertBlock()->getParent();
 
@@ -2212,6 +2291,7 @@ Value *IfASTnode::codegen() {
 
   TheFunction->getBasicBlockList().push_back(ElseBB);
   Builder.SetInsertPoint(ElseBB);
+  fprintf(stderr, "LABADIENA\n");
 
   Value *ElseV = Else->codegen();
   if (!ElseV) {
@@ -2226,6 +2306,7 @@ Value *IfASTnode::codegen() {
 }
 
 Value *ElseASTnode::codegen() {
+  fprintf(stderr, "Else Codegen\n");
   return Block->codegen();
 }
 
@@ -2238,6 +2319,7 @@ Value *WhileASTnode::codegen() {
   BasicBlock *LoopBB = BasicBlock::Create(TheContext, "loop", TheFunction);
   BasicBlock *AfterBB = BasicBlock::Create(TheContext, "afterloop", TheFunction);
 
+  // Builder.CreateBr(LoopBB);
   Builder.CreateCondBr(Cond, LoopBB, AfterBB);
   Builder.SetInsertPoint(LoopBB);
 
@@ -2253,34 +2335,13 @@ Value *WhileASTnode::codegen() {
   EndCond = Builder.CreateFCmpONE(EndCond, ConstantFP::get(TheContext, APFloat(0.0)), "loopcond");
 
   BasicBlock *LoopEndBB = Builder.GetInsertBlock();
+  // BasicBlock *AfterBB = BasicBlock::Create(TheContext, "afterloop", TheFunction);
 
   Builder.CreateCondBr(EndCond, LoopBB, AfterBB);
   Builder.SetInsertPoint(AfterBB);
 
   return Constant::getNullValue(Type::getFloatTy(TheContext));
 }
-
-Value *GlobalASTnode::codegen() {
-  std::string Name = get_name();
-
-  std::string var_type = Type->get_var_type();
-  Value *InitVal;
-  llvm::Type *alloca_type;
-  if (var_type.compare("int")==0) {
-    alloca_type = Type::getInt32Ty(TheContext);
-    InitVal = ConstantInt::get(TheContext, APInt(32, 0, false));
-  } else if (var_type.compare("float")==0) {
-    alloca_type = Type::getFloatTy(TheContext);
-    float val = 0;
-    InitVal = ConstantFP::get(TheContext, APFloat(val));
-  } else if (var_type.compare("bool")==0) {
-    alloca_type = Type::getInt1Ty(TheContext);
-    InitVal = ConstantInt::get(TheContext, APInt(1, 0, false));
-  }
-  GlobalNamedValues[Name] = InitVal;
-  return nullptr;
-}
-
 
 //===----------------------------------------------------------------------===//
 // AST Printer
@@ -2297,9 +2358,46 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 //===----------------------------------------------------------------------===//
 
 int main(int argc, char **argv) {
+  // if (argc == 2) {
+  //   pFile = fopen(argv[1], "r");
+  //   if (pFile == NULL)
+  //     perror("Error opening file");
+  // } else {
+  //   std::cout << "Usage: ./code InputFile\n";
+  //   return 1;
+  // }
+  //
+  // // initialize line number and column numbers to zero
+  // lineNo = 1;
+  // columnNo = 1;
+  //
+  // // get the first token
+  // getNextToken();
+  // while (CurTok.type != EOF_TOK) {
+  //   fprintf(stderr, "Token: %s with type %d\n", CurTok.lexeme.c_str(),
+  //           CurTok.type);
+  //   getNextToken();
+  // }
+  // fprintf(stderr, "Lexer Finished\n");
+  // fclose(pFile);
 
   // Make the module, which holds all the code.
   TheModule = std::make_unique<Module>("mini-c", TheContext);
+
+  // llvm::TheFPM = std::make_unique<legacy::FunctionPassManager>(TheModule.get());
+  //
+  // // Promote allocas to registers.
+  // llvm::TheFPM->add(createPromoteMemoryToRegisterPass());
+  // // Do simple "peephole" optimizations and bit-twiddling optzns.
+  // llvm::TheFPM->add(createInstructionCombiningPass());
+  // // Reassociate expressions.
+  // llvm::TheFPM->add(createReassociatePass());
+  // // Eliminate Common SubExpressions.
+  // llvm::TheFPM->add(createGVNPass());
+  // // Simplify the control flow graph (deleting unreachable blocks, etc).
+  // llvm::TheFPM->add(createCFGSimplificationPass());
+  //
+  // llvm::TheFPM->doInitialization();
 
 
   if (argc == 2) {

@@ -9,7 +9,6 @@ entry:
   %n1 = alloca i32
   store i32 %n, i32* %n1
   store i32 0, i32* %result
-  store i32 12, i32 0
   store i32 0, i32* %result
   %calltmp = call i32 @print_int(i32 0)
   %result2 = load i32, i32* %result

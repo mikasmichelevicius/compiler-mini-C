@@ -38,7 +38,7 @@ rval3             -> rval4 rval3'
 rval3'            -> "==" rval4 rval3' | "!=" rval4 rval3' | eps
 rval4             -> rval5 rval4'
 rval4'            -> "<=" rval5 rval4' | "<" rval5 rval4'
-                      | ">=" rval5 rval4' | ">" rval4 rval4' | eps
+                      | ">=" rval5 rval4' | ">" rval5 rval4' | eps
 rval5             -> rval6 rval5'
 rval5'            -> "+" rval6 rval5' | "-" rval6 rval5 | eps
 rval6             -> rval7 rval6'
