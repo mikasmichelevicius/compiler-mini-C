@@ -1,21 +1,21 @@
 
-program           -> extern_list decl_list
-                      | decl_list
-
-
+program           -> extern_list globals_list decl_list
+                      | globals_list decl_list
+globals_list      -> global globals_list | eps
+global            -> param ";"
 extern_list       -> extern extern_list'
 extern_list'      -> extern extern_list' | eps
-extern            -> "extern" type_spec IDENT "(" params ")" ";"
+extern            -> "extern" prototype ";"
+prototype         -> type_spec IDENT "(" params ")"
 decl_list         -> decl decl_list'
 decl_list'        -> decl decl_list' | eps
-decl              -> "void" IDENT func_decl | var_type IDENT var_or_func
-var_or_func       -> ";" | func_decl
-func_decl         -> "(" params ")" block
+decl              -> prototype block
+type_spec         -> "void" | var_type
 params            -> param_list | "void" | eps
-var_type          -> "int" | "float" | "bool"
 param_list        -> param param_list'
 param_list'       -> "," param param_list' | eps
 param             -> var_type IDENT
+var_type          -> "int" | "float" | "bool"
 stmt              -> expr_stmt | block | if_stmt
                       | while_stmt | return_stmt
 return_stmt       -> "return" return_stmt_tail
@@ -25,7 +25,7 @@ else_stmt         -> "else" block | eps
 while_stmt        -> "while" "(" expr ")" stmt
 block             -> "{" local_decls stmt_list "}"
 local_decls       -> local_decl local_decls | eps
-local_decl        -> var_type IDENT ";"
+local_decl        -> param ";"
 stmt_list         -> stmt stmt_list | eps
 expr_stmt         -> expr ";" | ";"
 expr              -> IDENT "=" expr | rval

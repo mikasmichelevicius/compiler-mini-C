@@ -19,6 +19,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
+#include <llvm/Support/raw_ostream.h>
 #include <algorithm>
 #include <cassert>
 #include <cctype>
@@ -459,17 +460,6 @@ public:
   }
 };
 
-class SemicolASTnode : public ASTnode {
-  std::string Semicol;
-
-public:
-  SemicolASTnode(TOKEN tok) : Semicol(tok.lexeme.c_str()) {}
-  virtual Value *codegen() override {}
-  virtual std::string to_string() const override {
-    return "";
-  }
-};
-
 class IdentASTnode : public ASTnode {
   TOKEN Tok;
   std::string Name;
@@ -837,9 +827,6 @@ public:
   }
 };
 
-
-
-
 /* add other AST nodes as nessasary */
 
 //===----------------------------------------------------------------------===//
@@ -867,14 +854,10 @@ static std::unique_ptr<ASTnode> ParseElseStmt();
 static std::unique_ptr<ParamASTnode> ParseParam();
 static std::vector<std::unique_ptr<ParamASTnode>> ParseParamList();
 static std::vector<std::unique_ptr<ParamASTnode>> ParseParams();
-static std::unique_ptr<ASTnode> ParseFuncDecl();
-static std::vector<std::unique_ptr<ASTnode>> ParseDeclList();
-static std::unique_ptr<ASTnode> ParseDecl();
-static std::vector<std::unique_ptr<ASTnode>> ParseExternList();
 static std::unique_ptr<ASTnode> LogError(const char *Str);
-static std::unique_ptr<PrototypeAST> ParseExtern2();
-static std::vector<std::unique_ptr<PrototypeAST>> ParseExternList2();
-static std::vector<std::unique_ptr<PrototypeAST>> ParseExternListPrime2();
+static std::unique_ptr<PrototypeAST> ParseExtern();
+static std::vector<std::unique_ptr<PrototypeAST>> ParseExternList();
+static std::vector<std::unique_ptr<PrototypeAST>> ParseExternListPrime();
 static std::unique_ptr<PrototypeAST> ParsePrototype();
 static std::unique_ptr<FunctionAST> ParseFunction();
 static std::vector<std::unique_ptr<FunctionAST>> ParseFunctionsList();
@@ -887,7 +870,7 @@ static std::vector<std::unique_ptr<GlobalASTnode>> ParseGlobals();
 static std::unique_ptr<ASTnode> parser() {
   // add body
   if (CurTok.type == EXTERN) {
-    auto extern_list = ParseExternList2();
+    auto extern_list = ParseExternList();
     int t = CurTok.type;
     if ((t != VOID_TOK) && (t != INT_TOK) && (t != FLOAT_TOK) && (t != BOOL_TOK)) {
       LogError("ERROR. Missing function type.");
@@ -1003,12 +986,12 @@ static std::unique_ptr<ASTnode> LogError(const char *Str) {
   exit(0);
 }
 
-static std::vector<std::unique_ptr<PrototypeAST>> ParseExternListPrime2() {
+static std::vector<std::unique_ptr<PrototypeAST>> ParseExternListPrime() {
   std::vector<std::unique_ptr<PrototypeAST>> extern_list_prime;
 
   int t = CurTok.type;
   while (t == EXTERN) {
-    auto ext = ParseExtern2();
+    auto ext = ParseExtern();
     if (ext) {
       auto *ExternIR = ext->codegen();
       extern_list_prime.push_back(std::move(ext));
@@ -1019,14 +1002,14 @@ static std::vector<std::unique_ptr<PrototypeAST>> ParseExternListPrime2() {
   return extern_list_prime;
 }
 
-static std::vector<std::unique_ptr<PrototypeAST>> ParseExternList2() {
+static std::vector<std::unique_ptr<PrototypeAST>> ParseExternList() {
   std::vector<std::unique_ptr<PrototypeAST>> extern_list;
 
-  auto ext = ParseExtern2();
+  auto ext = ParseExtern();
   if (ext) {
     auto *ExternIR = ext->codegen();
     extern_list.push_back(std::move(ext));
-    auto extern_list_prime = ParseExternListPrime2();
+    auto extern_list_prime = ParseExternListPrime();
     for(unsigned i=0; i<extern_list_prime.size(); i++) {
       extern_list.push_back(std::move(extern_list_prime.at(i)));
     }
@@ -1034,7 +1017,7 @@ static std::vector<std::unique_ptr<PrototypeAST>> ParseExternList2() {
   return extern_list;
 }
 
-static std::unique_ptr<PrototypeAST> ParseExtern2() {
+static std::unique_ptr<PrototypeAST> ParseExtern() {
   if (CurTok.type == EXTERN) {
     getNextToken();
     auto prototype =  ParsePrototype();
@@ -1171,14 +1154,12 @@ static std::unique_ptr<ASTnode> ParseReturnStmt() {
   getNextToken();
   int t = CurTok.type;
   if (t == SC) {
-    auto semicol = std::make_unique<SemicolASTnode>(CurTok);
     auto Result = std::make_unique<ReturnASTnode>(nullptr);
     getNextToken();
     return std::move(Result);
   } else if ((t==INT_LIT) || (t==FLOAT_LIT) || (t==BOOL_LIT) || (t==MINUS) || (t==NOT) || (t==IDENT) || (t==LPAR)) {
     auto expr = ParseExpr();
     if (CurTok.type==SC) {
-      auto semicol = std::make_unique<SemicolASTnode>(CurTok);
       auto Result = std::make_unique<ReturnASTnode>(std::move(expr));
       getNextToken();
       return std::move(Result);
@@ -1828,37 +1809,74 @@ Value *ExpressionASTnode::codegen() {
     return nullptr;
   }
 
-  if ((L->getType() == Type::Type::getInt32Ty(TheContext)) && (R->getType() == Type::Type::getFloatTy(TheContext))) {
-    L = Builder.CreateSIToFP(L, Type::getFloatTy(TheContext));
-  } else if ((R->getType() == Type::Type::getInt32Ty(TheContext)) && (L->getType() == Type::Type::getFloatTy(TheContext))) {
-    R = Builder.CreateSIToFP(R, Type::getFloatTy(TheContext));
+  llvm::Type* ltype = L->getType();
+  llvm::Type* rtype = R->getType();
+
+  if (ltype == Type::getInt32Ty(TheContext)) {
+    if (rtype == Type::getInt1Ty(TheContext)) {
+      return LogErrorV("Arithmetic operation cannot be performed on Integer and Boolean");
+    }
+    if (rtype == Type::getFloatTy(TheContext)) {
+      L = Builder.CreateSIToFP(L, Type::getFloatTy(TheContext));
+    }
+
+  } else if (ltype == Type::getFloatTy(TheContext)) {
+    if (rtype == Type::getInt1Ty(TheContext)) {
+      return LogErrorV("Arithmetic operation cannot be performed on Float and Boolean");
+    }
+    if (rtype == Type::getInt32Ty(TheContext)) {
+      R = Builder.CreateSIToFP(R, Type::getFloatTy(TheContext));
+    }
+
+  } else if (ltype == Type::getInt1Ty(TheContext)) {
+    if (rtype == Type::getInt32Ty(TheContext)) {
+      return LogErrorV("Arithmetic operation cannot be performed on Integer and Boolean");
+    }
+    if (rtype == Type::getFloatTy(TheContext)) {
+      return LogErrorV("Arithmetic operation cannot be performed on Float and Boolean");
+    }
   }
 
   if (Op.compare("+")==0) {
+    if ((L->getType() == Type::getInt1Ty(TheContext)) || (R->getType() == Type::getInt1Ty(TheContext))) {
+      return LogErrorV("Arithmetic addition operation cannot be performed with boolean operands");
+    }
     if (L->getType() == Type::getInt32Ty(TheContext)) {
       return Builder.CreateAdd(L, R, "addtmp");
     } else if (L->getType() == Type::getFloatTy(TheContext)) {
       return Builder.CreateFAdd(L, R, "addtmp");
     }
   } else if (Op.compare("*")==0) {
+    if ((L->getType() == Type::getInt1Ty(TheContext)) || (R->getType() == Type::getInt1Ty(TheContext))) {
+      return LogErrorV("Arithmetic multiplication operation cannot be performed with boolean operands");
+    }
     if (L->getType() == Type::getInt32Ty(TheContext)) {
       return Builder.CreateMul(L, R, "addtmp");
     } else if (L->getType() == Type::getFloatTy(TheContext)) {
       return Builder.CreateFMul(L, R, "addtmp");
     }
   } else if (Op.compare("-")==0) {
+    if ((L->getType() == Type::getInt1Ty(TheContext)) || (R->getType() == Type::getInt1Ty(TheContext))) {
+      return LogErrorV("Arithmetic substraction operation cannot be performed with boolean operands");
+    }
     if (L->getType() == Type::getInt32Ty(TheContext)) {
       return Builder.CreateSub(L, R, "subtmp");
     } else if (L->getType() == Type::getFloatTy(TheContext)) {
       return Builder.CreateFSub(L, R, "subtmp");
     }
   } else if (Op.compare("/")==0) {
+    if ((L->getType() == Type::getInt1Ty(TheContext)) || (R->getType() == Type::getInt1Ty(TheContext))) {
+      return LogErrorV("Arithmetic division operation cannot be performed with boolean operands");
+    }
     if (L->getType() == Type::getInt32Ty(TheContext)) {
       return Builder.CreateSDiv(L, R, "divtmp");
     } else if(L->getType() == Type::getFloatTy(TheContext)) {
       return Builder.CreateFDiv(L, R, "divtmp");
     }
   } else if (Op.compare("%")==0) {
+    if ((L->getType() == Type::getInt1Ty(TheContext)) || (R->getType() == Type::getInt1Ty(TheContext))) {
+      return LogErrorV("Arithmetic modulo operation cannot be performed with boolean operands");
+    }
     if (L->getType() == Type::getInt32Ty(TheContext)) {
       return Builder.CreateSRem(L, R, "remtmp");
     } else if(L->getType() == Type::getFloatTy(TheContext)) {
@@ -1866,6 +1884,9 @@ Value *ExpressionASTnode::codegen() {
     }
     return Builder.CreateFRem(L, R, "remtmp");
   } else if (Op.compare("<")==0) {
+    if ((L->getType() == Type::getInt1Ty(TheContext)) || (R->getType() == Type::getInt1Ty(TheContext))) {
+      return LogErrorV("Arithmetic comparison operation cannot be performed with boolean operands");
+    }
     if (L->getType() == Type::getInt32Ty(TheContext)) {
       L = Builder.CreateICmpULT(L, R, "cmptmp");
     } else if (L->getType() == Type::getFloatTy(TheContext)) {
@@ -1873,6 +1894,9 @@ Value *ExpressionASTnode::codegen() {
     }
     return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),"booltmp");
   } else if (Op.compare(">")==0) {
+    if ((L->getType() == Type::getInt1Ty(TheContext)) || (R->getType() == Type::getInt1Ty(TheContext))) {
+      return LogErrorV("Arithmetic comparison operation cannot be performed with boolean operands");
+    }
     if (L->getType() == Type::getInt32Ty(TheContext)) {
       L = Builder.CreateICmpUGT(L, R, "cmptmp");
     } else if (L->getType() == Type::getFloatTy(TheContext)) {
@@ -1880,6 +1904,9 @@ Value *ExpressionASTnode::codegen() {
     }
     return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),"booltmp");
   } else if (Op.compare("<=")==0) {
+    if ((L->getType() == Type::getInt1Ty(TheContext)) || (R->getType() == Type::getInt1Ty(TheContext))) {
+      return LogErrorV("Arithmetic comparison operation cannot be performed with boolean operands");
+    }
     if (L->getType() == Type::getInt32Ty(TheContext)) {
       L = Builder.CreateICmpULE(L, R, "cmptmp");
     } else if (L->getType() == Type::getFloatTy(TheContext)) {
@@ -1887,6 +1914,9 @@ Value *ExpressionASTnode::codegen() {
     }
     return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),"booltmp");
   } else if (Op.compare(">=")==0) {
+    if ((L->getType() == Type::getInt1Ty(TheContext)) || (R->getType() == Type::getInt1Ty(TheContext))) {
+      return LogErrorV("Arithmetic comparison operation cannot be performed with boolean operands");
+    }
     if (L->getType() == Type::getInt32Ty(TheContext)) {
       L = Builder.CreateICmpUGE(L, R, "cmptmp");
     } else if (L->getType() == Type::getFloatTy(TheContext)) {
@@ -1912,8 +1942,14 @@ Value *ExpressionASTnode::codegen() {
     }
     return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),"booltmp");
   } else if (Op.compare("||")==0) {
+    if ((L->getType() != Type::getInt1Ty(TheContext)) || (R->getType() != Type::getInt1Ty(TheContext))) {
+      return LogErrorV("Arithmetic OR operation can only be performed with boolean operands");
+    }
     return Builder.CreateOr(L, R);
   } else if (Op.compare("&&")==0) {
+    if ((L->getType() != Type::getInt1Ty(TheContext)) || (R->getType() != Type::getInt1Ty(TheContext))) {
+      return LogErrorV("Arithmetic AND operation can only be performed with boolean operands");
+    }
     return Builder.CreateAnd(L,R);
   }
 
@@ -2105,7 +2141,13 @@ Value *ParamASTnode::codegen() {
   std::string var_name = Id->get_id_name();
   Value *Variable = NamedValues[var_name];
   if (Variable) {
-    return LogErrorV("Variable with such name is already given to function as argument");
+    std::string ret = "Variable with name "+ var_name+" is already given to function as argument";
+    return LogErrorV(ret.c_str());
+  }
+  Variable = GlobalNamedValues[var_name];
+  if (Variable) {
+    std::string ret = "Variable with name " + var_name + " is already declared globally.";
+    return LogErrorV(ret.c_str());
   }
 
   std::string var_type = Type->get_var_type();

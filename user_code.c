@@ -3,15 +3,12 @@ int d;
 int g;
 
 float addition(int n, int m){
-	bool a;
-	bool b;
 	float result;
-	a = true;
-	b = false;
-	if (a || b) {
-		result = n+m;
-	} else {
-		result = n*m;
+	int n;
+	result = b+a;
+
+	if (a == b) {
+		result = 2.0;
 	}
 	return result;
 }
