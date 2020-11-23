@@ -866,10 +866,10 @@ static std::vector<std::unique_ptr<GlobalASTnode>> ParseGlobals();
 
 /* Add function calls for each production */
 
-// program ::= extern_list decl_list | decl_list
+// entry in the gramar
 static std::unique_ptr<ASTnode> parser() {
-  // add body
-  if (CurTok.type == EXTERN) {
+
+  if (CurTok.type == EXTERN) {//FIRST(extern_list)
     auto extern_list = ParseExternList();
     int t = CurTok.type;
     if ((t != VOID_TOK) && (t != INT_TOK) && (t != FLOAT_TOK) && (t != BOOL_TOK)) {
@@ -900,7 +900,7 @@ static std::vector<std::unique_ptr<FunctionAST>> ParseFunctionsListPrime() {
   std::vector<std::unique_ptr<FunctionAST>> funcs_list_prime;
 
   int t = CurTok.type;
-  while ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK) || (t==VOID_TOK)) {
+  while ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK) || (t==VOID_TOK)) {  //FIRST(decl)
     auto func = ParseFunction();
     if (func) {
       auto *FuncIR = func->codegen();
@@ -990,7 +990,7 @@ static std::vector<std::unique_ptr<PrototypeAST>> ParseExternListPrime() {
   std::vector<std::unique_ptr<PrototypeAST>> extern_list_prime;
 
   int t = CurTok.type;
-  while (t == EXTERN) {
+  while (t == EXTERN) { //FIRST(extern)
     auto ext = ParseExtern();
     if (ext) {
       auto *ExternIR = ext->codegen();
@@ -1018,7 +1018,7 @@ static std::vector<std::unique_ptr<PrototypeAST>> ParseExternList() {
 }
 
 static std::unique_ptr<PrototypeAST> ParseExtern() {
-  if (CurTok.type == EXTERN) {
+  if (CurTok.type == EXTERN) {  //FIRST(extern)
     getNextToken();
     auto prototype =  ParsePrototype();
 
@@ -1035,7 +1035,7 @@ static std::unique_ptr<PrototypeAST> ParseExtern() {
 static std::unique_ptr<PrototypeAST> ParsePrototype() {
 
   int t = CurTok.type;
-  if ((t==VOID_TOK) || (t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK)) {
+  if ((t==VOID_TOK) || (t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK)) { //FIRST(type_spec)
     auto type = std::make_unique<VarTypeASTnode>(CurTok);
     getNextToken();
 
@@ -1072,7 +1072,7 @@ static std::unique_ptr<PrototypeAST> ParsePrototype() {
 static std::vector<std::unique_ptr<ParamASTnode>> ParseParams() {
   std::vector<std::unique_ptr<ParamASTnode>> params;
   int t = CurTok.type;
-  if ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK)) {
+  if ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK)) {  //FIRST(param_list)
     params = ParseParamList();
     return params;
 
@@ -1131,7 +1131,7 @@ static std::vector<std::unique_ptr<ParamASTnode>> ParseParamList() {
 
 static std::unique_ptr<ParamASTnode> ParseParam() {
   int t = CurTok.type;
-  if ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK)) {
+  if ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK)) {    //FIRST(var_type)
     auto type = std::make_unique<VarTypeASTnode>(CurTok);
 
     getNextToken();
@@ -1153,11 +1153,12 @@ static std::unique_ptr<ParamASTnode> ParseParam() {
 static std::unique_ptr<ASTnode> ParseReturnStmt() {
   getNextToken();
   int t = CurTok.type;
-  if (t == SC) {
+  if (t == SC) {  //return_stmt_tail::=";"
     auto Result = std::make_unique<ReturnASTnode>(nullptr);
     getNextToken();
     return std::move(Result);
-  } else if ((t==INT_LIT) || (t==FLOAT_LIT) || (t==BOOL_LIT) || (t==MINUS) || (t==NOT) || (t==IDENT) || (t==LPAR)) {
+  } else if ((t==INT_LIT) || (t==FLOAT_LIT) || (t==BOOL_LIT) || (t==MINUS) || (t==NOT) || (t==IDENT) || (t==LPAR)) {  //FIRST(expr)
+    //return_stmt_tail::=expr ";"
     auto expr = ParseExpr();
     if (CurTok.type==SC) {
       auto Result = std::make_unique<ReturnASTnode>(std::move(expr));
@@ -1204,6 +1205,7 @@ static std::unique_ptr<ASTnode> ParseIfStmt() {
 
 static std::unique_ptr<ASTnode> ParseElseStmt() {
   if (CurTok.type == ELSE) {
+    //else_stmt ::= "else" block
     getNextToken();
     if (CurTok.type == LBRA) {
       auto block = ParseBlock();
@@ -1270,15 +1272,18 @@ static std::vector<std::unique_ptr<ASTnode>> ParseStmtList() {
   std::vector<std::unique_ptr<ASTnode>> stmt_list;
 
   int t = CurTok.type;
-  if (t == RBRA) {
+  if (t == RBRA) {  //stmt_list ::= eps
     return stmt_list;
   }
   if ((t==INT_LIT) || (t==FLOAT_LIT) || (t==BOOL_LIT) || (t==MINUS) || (t==NOT) || (t==IDENT) || (t==LPAR) || (t==SC) || (t==IF) || (t==RETURN) || (t==WHILE) || (t==LBRA)) {
+    //FIRST(stmt)
+    //stmt_list ::= stmt smtmt_list
     auto stmt = ParseStmt();
     if (stmt) {
       stmt_list.push_back(std::move(stmt));
       t = CurTok.type;
       while((t==INT_LIT) || (t==FLOAT_LIT) || (t==BOOL_LIT) || (t==MINUS) || (t==NOT) || (t==IDENT) || (t==LPAR) || (t==SC) || (t==IF) || (t==RETURN) || (t==WHILE) || (t==LBRA)) {
+        //FIRST(stmt)
         stmt = ParseStmt();
         if (stmt) {
           stmt_list.push_back(std::move(stmt));
@@ -1296,7 +1301,7 @@ static std::vector<std::unique_ptr<ASTnode>> ParseStmtList() {
 static std::vector<std::unique_ptr<ASTnode>> ParseLocalDecls() {
   std::vector<std::unique_ptr<ASTnode>> decl_list;
   int t = CurTok.type;
-  if ((t==INT_TOK) || (t==BOOL_TOK) || (t==FLOAT_TOK)) {
+  if ((t==INT_TOK) || (t==BOOL_TOK) || (t==FLOAT_TOK)) { //FIRST(local_decl)
     auto local_decl = ParseLocalDecl();
     if (local_decl) {
       decl_list.push_back(std::move(local_decl));
@@ -1320,7 +1325,7 @@ static std::vector<std::unique_ptr<ASTnode>> ParseLocalDecls() {
 
 static std::unique_ptr<ASTnode> ParseLocalDecl() {
   int t = CurTok.type;
-  if ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK)) {
+  if ((t==INT_TOK) || (t==FLOAT_TOK) || (t==BOOL_TOK)) { //FIRST(param)
 
     auto var_type = ParseVarType();
     if (CurTok.type == IDENT) {
@@ -1384,12 +1389,14 @@ static std::unique_ptr<ASTnode> ParseBoolNumberExpr() {
   return std::move(Result);
 }
 
+// rval7 ::= IDENT
 static std::unique_ptr<ASTnode> ParseIdentExpr() {
   auto Result = std::make_unique<IdentASTnode>(CurTok);
   getNextToken();
   return std::move(Result);
 }
 
+// rval7 ::= "!" rval7 | "-" rval7
 static std::unique_ptr<ASTnode> ParseNegativeExpr() {
   char op;
   if (CurTok.type == MINUS) {
@@ -1410,24 +1417,30 @@ static std::unique_ptr<ASTnode> ParseNegativeExpr() {
 static std::unique_ptr<ASTnode> ParseStmt() {
   int t = CurTok.type;
 
-  if (t==LBRA) {
+  if (t==LBRA) {  //FIRST(block)
+    //stmt ::= block
     auto block = ParseBlock();
     if (block) {return std::move(block);}
   }
-  else if (t==IF) {
+  else if (t==IF) {  //FIRST(if_stmt)
+    //stmt ::= if_stmt
     auto if_stmt = ParseIfStmt();
     if(if_stmt) {return std::move(if_stmt);}
   }
-  else if (t==WHILE) {
+  else if (t==WHILE) {  //FIRST(while_stmt)
+    //stmt ::= while_stmt
     auto while_stmt = ParseWhileStmt();
     if (while_stmt) {return std::move(while_stmt);}
   }
-  else if (t==RETURN) {
+  else if (t==RETURN) {  //FIRST(return_stmt)
+    //stmt ::= return_stmt
     auto return_stmt = ParseReturnStmt();
     if (return_stmt) {return std::move(return_stmt);}
 
   }
   else if ((t==INT_LIT) || (t==FLOAT_LIT) || (t==BOOL_LIT) || (t==MINUS) || (t==NOT) || (t==IDENT) || (t==LPAR) || (t==SC)) {
+    //FIRST(expr_stmt)
+    //smtt ::= expr_stmts
     auto expr_stmt = ParseExprStmt();
     if (expr_stmt) {
       return std::move(expr_stmt);
@@ -1441,10 +1454,12 @@ static std::unique_ptr<ASTnode> ParseStmt() {
 static std::unique_ptr<ASTnode> ParseExprStmt() {
   int t = CurTok.type;
 
-  //expand by expr_stmt ::= expr
+  // expr_stmt ::= expr
   if ((t==INT_LIT) || (t==FLOAT_LIT) || (t==BOOL_LIT) || (t==MINUS) || (t==NOT) || (t==IDENT) || (t==LPAR)) {
-    auto Expr_parsed = ParseExpr();
+    //FIRST(expr)
+    // expr_stmt ::= expr
 
+    auto Expr_parsed = ParseExpr();
     t = CurTok.type;
     if (t==SC) {
       if (Expr_parsed) {
@@ -1463,6 +1478,7 @@ static std::unique_ptr<ASTnode> ParseExpr() {
   int t = CurTok.type;
 
   if (t==IDENT) {
+    // expr ::= IDENT "=" expr
     TOKEN identTok = CurTok;
     getNextToken();
     if (CurTok.type == ASSIGN) {
@@ -1482,6 +1498,7 @@ static std::unique_ptr<ASTnode> ParseExpr() {
   }
 
   if ((t==INT_LIT) || (t==FLOAT_LIT) || (t==BOOL_LIT) || (t==MINUS) || (t==NOT) || (t==IDENT) || (t==LPAR)) {
+    //expr ::= rval
     auto Rval = Rval1Expr();
     if (Rval) {
       return std::move(Rval);
@@ -1500,7 +1517,8 @@ static std::unique_ptr<ASTnode> Rval1Expr() {
 
     t = CurTok.type;
     TOKEN op = CurTok;
-    if (t == OR) {
+    if (t == OR) { //FIRST(rval1')
+      //rval1 = rval2 rval1'
       getNextToken();
       auto Rval1 = Rval1Expr();
       if (Rval1 && Rval2) {
@@ -1508,6 +1526,7 @@ static std::unique_ptr<ASTnode> Rval1Expr() {
         return std::move(Result);
       }
     } else {
+      // rval1' ::= eps
       if (Rval2) {return Rval2;}
     }
 
@@ -1524,7 +1543,8 @@ static std::unique_ptr<ASTnode> Rval2Expr() {
 
     t = CurTok.type;
     TOKEN op = CurTok;
-    if (t == AND) {
+    if (t == AND) {//FIRST(rval2')
+      //rval2 = rval3 rval2'
       getNextToken();
       auto Rval2 = Rval2Expr();
       if (Rval2 && Rval3) {
@@ -1532,6 +1552,7 @@ static std::unique_ptr<ASTnode> Rval2Expr() {
         return std::move(Result);
       }
     } else {
+      // rval2' ::= eps
       if (Rval3) {return Rval3;}
     }
 
@@ -1548,7 +1569,8 @@ static std::unique_ptr<ASTnode> Rval3Expr() {
 
     t = CurTok.type;
     TOKEN op = CurTok;
-    if ((t==EQ) || (t==NE)) {
+    if ((t==EQ) || (t==NE)) {//FIRST(rval3')
+      //rval3 = rval4 rval3'
       getNextToken();
       auto Rval3 = Rval3Expr();
       if (Rval3 && Rval4) {
@@ -1556,6 +1578,7 @@ static std::unique_ptr<ASTnode> Rval3Expr() {
         return std::move(Result);
       }
     } else {
+      // rval3' ::= eps
       if (Rval4) {return Rval4;}
     }
 
@@ -1573,7 +1596,8 @@ static std::unique_ptr<ASTnode> Rval4Expr() {
 
     t = CurTok.type;
     TOKEN op = CurTok;
-    if ((t==LE) || (t==LT) || (t==GE) || (t==GT)) {
+    if ((t==LE) || (t==LT) || (t==GE) || (t==GT)) { //FIRST(rval4')
+        //rval4 = rval5 rval4'
         getNextToken();
         auto Rval4 = Rval4Expr();
         if (Rval4 && Rval5) {
@@ -1581,6 +1605,7 @@ static std::unique_ptr<ASTnode> Rval4Expr() {
           return std::move(Result);
         }
     } else {
+      // rval4' ::= eps
       if (Rval5) {return Rval5;}
     }
 
@@ -1598,7 +1623,8 @@ static std::unique_ptr<ASTnode> Rval5Expr() {
 
     t = CurTok.type;
     TOKEN op = CurTok;
-    if ((t==PLUS) || (t==MINUS)) {
+    if ((t==PLUS) || (t==MINUS)) {  //FIRST(rval5')
+        //rval5 = rval6 rval5'
       getNextToken();
       auto Rval5 = Rval5Expr();
       if (Rval5 && Rval6) {
@@ -1607,6 +1633,7 @@ static std::unique_ptr<ASTnode> Rval5Expr() {
       }
 
     } else {
+      // rval5' ::= eps
       if (Rval6) {return Rval6;}
     }
 
@@ -1624,7 +1651,8 @@ static std::unique_ptr<ASTnode> Rval6Expr() {
 
     t = CurTok.type;
     TOKEN op = CurTok;
-    if((t==ASTERIX) || (t==DIV) || (t==MOD)) {
+    if((t==ASTERIX) || (t==DIV) || (t==MOD)) { //FIRST(rval6')
+        //rval6 = rval7 rval6'
       getNextToken();
       auto Rval6 = Rval6Expr();
       if (Rval6 && Rval7) {
@@ -1633,6 +1661,7 @@ static std::unique_ptr<ASTnode> Rval6Expr() {
       }
 
     } else {
+      // rval6' ::= eps
       if (Rval7) {return Rval7;}
     }
 
@@ -1644,27 +1673,27 @@ static std::unique_ptr<ASTnode> Rval6Expr() {
 
 static std::unique_ptr<ASTnode> Rval7Expr() {
   if (CurTok.type == INT_LIT) {
-    //expand by rval7 ::= INT_LIT
+    // rval7 ::= INT_LIT
     auto int_lit = ParseIntNumberExpr();
     if(int_lit) {return int_lit;}
   }
   else if (CurTok.type == FLOAT_LIT) {
-    //expand by rval7 ::= FLOAT_LIT
+    // rval7 ::= FLOAT_LIT
     auto float_lit = ParseFloatNumberExpr();
     if (float_lit) {return float_lit;}
   }
   else if (CurTok.type == BOOL_LIT) {
-    //expand by rval7 ::= BOOL_LIT
+    // rval7 ::= BOOL_LIT
     auto bool_lit = ParseBoolNumberExpr();
     if (bool_lit) {return bool_lit;}
   }
   else if (CurTok.type == MINUS) {
-    //expand by rval7 ::= "-"rval7
+    // rval7 ::= "-"rval7
     auto negative_expr = ParseNegativeExpr();
     if (negative_expr) {return negative_expr;}
   }
   else if (CurTok.type == NOT) {
-    //expand by rval7 ::= "!"rval7
+    // rval7 ::= "!"rval7
     auto negation_expr = ParseNegativeExpr();
     if (negation_expr) {return negation_expr;}
   }
@@ -1672,7 +1701,7 @@ static std::unique_ptr<ASTnode> Rval7Expr() {
     TOKEN identTok = CurTok;
     getNextToken();
     if (CurTok.type == LPAR) {
-      //expand by rval7 ::= IDENT "(" args ")" ---------------------------------
+      //rval7 ::= IDENT "(" args ")"
       auto ident = std::make_unique<IdentASTnode>(identTok);
       getNextToken();
       auto arg_list = ParseArgsList();
@@ -1682,7 +1711,7 @@ static std::unique_ptr<ASTnode> Rval7Expr() {
       return std::move(Result);
 
     } else {
-      //expand by rval7 ::= IDENT
+      //rval7 ::= IDENT
       putBackToken(CurTok);
       putBackToken(identTok);
       getNextToken();
@@ -1691,7 +1720,7 @@ static std::unique_ptr<ASTnode> Rval7Expr() {
     }
   }
   else if (CurTok.type == LPAR) {
-    //expand by rval7 ::= "(" expr ")"
+    // rval7 ::= "(" expr ")"
     getNextToken();
     auto expr_parsed = ParseExpr();
     if (expr_parsed) {
